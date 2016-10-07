@@ -1,5 +1,7 @@
 #include <windows.h>
+
 #include <cstdint>
+#include <cstdio>
 
 struct win32_back_buffer
 {
@@ -67,9 +69,9 @@ static LRESULT CALLBACK Win32MainCallWindowCallback(HWND Window, UINT Message, W
             {
                 for (int XIndex = 0; XIndex < GlobalBackBuffer.Width; ++XIndex)
                 {
-                    uint8_t b = 255;
-                    uint8_t g = 30;
-                    uint8_t r = 127;
+                    uint8_t b = XIndex;
+                    uint8_t g = YIndex;
+                    uint8_t r = XIndex + YIndex;
                     *Pixel++ = (b << 0 | g << 8 | r << 16);
                 }
             }
@@ -144,14 +146,24 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                 MSG Message;
                 while(PeekMessage(&Message, 0, 0, 0, PM_REMOVE))
                 {
-                    if (Message.message == WM_QUIT)
+                    switch(Message.message)
                     {
-                        GlobalRunning = false;
-                    }
-                    else
-                    {
-                        TranslateMessage(&Message);
-                        DispatchMessageA(&Message);
+                        case WM_QUIT:
+                        {
+                            GlobalRunning = false;
+                        } break;
+                        case WM_KEYDOWN:
+                        {
+                            uint32_t KeyCode = (uint32_t)Message.wParam;
+                            char DebugMessage[255];
+                            snprintf(DebugMessage, 255, "%c", KeyCode);
+                            OutputDebugStringA(DebugMessage);
+                        } break;
+                        default:
+                        {
+                            TranslateMessage(&Message);
+                            DispatchMessageA(&Message);
+                        } break;
                     }
                 }
             }
