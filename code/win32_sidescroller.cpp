@@ -136,7 +136,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
     {
         HWND Window = CreateWindowEx( 0,
                                       WindowClass.lpszClassName,
-                                      "Generic Side-Scroller",
+                                      "Adequate Cube",
                                       WS_OVERLAPPEDWINDOW | WS_VISIBLE,
                                       CW_USEDEFAULT,
                                       CW_USEDEFAULT,
