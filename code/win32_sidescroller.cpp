@@ -13,8 +13,15 @@ struct win32_back_buffer
     int BytesPerPixel;
 };
 
+struct game_state
+{
+    int OffsetX;
+    int OffsetY;
+};
+
 static bool GlobalRunning = true;
 static win32_back_buffer GlobalBackBuffer;
+game_state GlobalGameState;
 
 static void Win32ResizeBackBuffer(win32_back_buffer *Buffer, int Width, int Height)
 {
@@ -46,12 +53,39 @@ static void Win32ResizeBackBuffer(win32_back_buffer *Buffer, int Width, int Heig
     int BufferMemorySize = Buffer->Height * Buffer->Width * Buffer->BytesPerPixel;
     Buffer->Memory = VirtualAlloc(0, BufferMemorySize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 }
+static void Win32PaintBackBuffer(HDC DeviceContext, win32_back_buffer *BackBuffer)
+{
+    int OffsetX = 10;
+    int OffsetY = 10;
+
+    // Note(joe): For right now, I'm just going to blit the buffer as-is without any stretching.
+    StretchDIBits(DeviceContext,
+                  OffsetX, OffsetY, BackBuffer->Width, BackBuffer->Height, // Destination
+                  0, 0, BackBuffer->Width, BackBuffer->Height, // Source
+                  BackBuffer->Memory, 
+                  &BackBuffer->Info,
+                  DIB_RGB_COLORS,
+                  SRCCOPY);
+}
+
+static void Update(win32_back_buffer *BackBuffer, game_state GameState)
+{
+    int32_t *Pixel = (int32_t *)BackBuffer->Memory;        
+    for (int YIndex = 0; YIndex < BackBuffer->Height; ++YIndex)
+    {
+        for (int XIndex = 0; XIndex < BackBuffer->Width; ++XIndex)
+        {
+            uint8_t b = GameState.OffsetX + XIndex;
+            uint8_t g = GameState.OffsetY + YIndex;
+            uint8_t r = GameState.OffsetX + XIndex + GameState.OffsetY + YIndex;
+            *Pixel++ = (b << 0 | g << 8 | r << 16);
+        }
+    }
+}
 
 static LRESULT CALLBACK Win32MainCallWindowCallback(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam)
 {
     LRESULT Result = 0;
-    // TODO(joe): This method is mainly responsible for responding to any keys that are pressed.
-    // Need to handle keyboard user input.
 
     switch(Message)
     {
@@ -64,38 +98,17 @@ static LRESULT CALLBACK Win32MainCallWindowCallback(HWND Window, UINT Message, W
         {
             OutputDebugStringA("Paint\n");
 
-            int32_t *Pixel = (int32_t *)GlobalBackBuffer.Memory;        
-            for (int YIndex = 0; YIndex < GlobalBackBuffer.Height; ++YIndex)
-            {
-                for (int XIndex = 0; XIndex < GlobalBackBuffer.Width; ++XIndex)
-                {
-                    uint8_t b = XIndex;
-                    uint8_t g = YIndex;
-                    uint8_t r = XIndex + YIndex;
-                    *Pixel++ = (b << 0 | g << 8 | r << 16);
-                }
-            }
-
             PAINTSTRUCT Paint;
             HDC DeviceContext = BeginPaint(Window, &Paint);
     
-            int OffsetX = 10;
-            int OffsetY = 10;
-
+            // Clear the entire client window to black.
             RECT ClientRect;
             GetClientRect(Window, &ClientRect);
             int ClientWidth = ClientRect.right - ClientRect.left;
             int ClientHeight = ClientRect.bottom - ClientRect.top;
             PatBlt(DeviceContext, 0, 0, ClientWidth, ClientHeight, BLACKNESS);
 
-            // Note(joe): For right now, I'm just going to blit the buffer as-is without any stretching.
-            StretchDIBits(DeviceContext,
-                          OffsetX, OffsetY, GlobalBackBuffer.Width, GlobalBackBuffer.Height, // Destination
-                          0, 0, GlobalBackBuffer.Width, GlobalBackBuffer.Height, // Source
-                          GlobalBackBuffer.Memory, 
-                          &GlobalBackBuffer.Info,
-                          DIB_RGB_COLORS,
-                          SRCCOPY);
+            Win32PaintBackBuffer(DeviceContext, &GlobalBackBuffer);
 
             EndPaint(Window, &Paint);
         } break;
@@ -137,7 +150,8 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
         {
             Win32ResizeBackBuffer(&GlobalBackBuffer, 960, 540);
 
-            
+            GlobalGameState.OffsetX = 0;
+            GlobalGameState.OffsetY = 0;
 
             GlobalRunning = true;
             while(GlobalRunning)
@@ -155,9 +169,27 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                         case WM_KEYDOWN:
                         {
                             uint32_t KeyCode = (uint32_t)Message.wParam;
-                            char DebugMessage[255];
-                            snprintf(DebugMessage, 255, "%c", KeyCode);
-                            OutputDebugStringA(DebugMessage);
+
+                            // TODO(joe): The processing of key presses should
+                            // not happen here. This should only translate
+                            // keypresses into user input for the game to
+                            // handle.
+                            if (KeyCode == 'W')
+                            {
+                                GlobalGameState.OffsetY -= 10;
+                            }
+                            else if (KeyCode == 'S')
+                            {
+                                GlobalGameState.OffsetY += 10;
+                            }
+                            else if (KeyCode == 'A')
+                            {
+                                GlobalGameState.OffsetX -= 10;
+                            }
+                            else if (KeyCode == 'D')
+                            {
+                                GlobalGameState.OffsetX += 10;
+                            }
                         } break;
                         default:
                         {
@@ -166,6 +198,10 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                         } break;
                     }
                 }
+
+                Update(&GlobalBackBuffer, GlobalGameState);
+                HDC DeviceContext = GetDC(Window);
+                Win32PaintBackBuffer(DeviceContext, &GlobalBackBuffer);
             }
         }
     }
