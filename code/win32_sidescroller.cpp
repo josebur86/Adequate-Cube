@@ -153,6 +153,13 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
             GlobalGameState.OffsetX = 0;
             GlobalGameState.OffsetY = 0;
 
+
+            LARGE_INTEGER PerformanceFrequencyCountPerSecond;
+            QueryPerformanceFrequency(&PerformanceFrequencyCountPerSecond);
+
+            LARGE_INTEGER PerformanceCount;
+            QueryPerformanceCounter(&PerformanceCount);
+            int64_t LastFrameCount = PerformanceCount.QuadPart;
             GlobalRunning = true;
             while(GlobalRunning)
             {
@@ -202,6 +209,20 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                 Update(&GlobalBackBuffer, GlobalGameState);
                 HDC DeviceContext = GetDC(Window);
                 Win32PaintBackBuffer(DeviceContext, &GlobalBackBuffer);
+
+                QueryPerformanceCounter(&PerformanceCount);
+                uint64_t FrameCount = PerformanceCount.QuadPart;
+
+                LARGE_INTEGER ElapsedCount;
+                ElapsedCount.QuadPart = FrameCount - LastFrameCount;
+                ElapsedCount.QuadPart *= 1000;
+                float MSPerFrame = (float)ElapsedCount.QuadPart / PerformanceFrequencyCountPerSecond.QuadPart;
+                float FPS = 1000.0f / MSPerFrame;
+
+                char FrameTimeString[255];
+                snprintf(FrameTimeString, 255, "MSPF: %.2f FPS: %.2f \n", MSPerFrame, FPS);
+                OutputDebugStringA(FrameTimeString);
+                LastFrameCount = FrameCount;
             }
         }
     }
