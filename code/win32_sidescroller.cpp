@@ -1,4 +1,5 @@
 #include <windows.h>
+#include <dsound.h>
 
 #include <cstdint>
 #include <cstdio>
@@ -150,9 +151,72 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
         {
             Win32ResizeBackBuffer(&GlobalBackBuffer, 960, 540);
 
+            // Create the primary buffer
+            LPDIRECTSOUND DirectSound; 
+            if (DirectSoundCreate(NULL, &DirectSound, NULL) == DS_OK)
+            {
+                if (DirectSound->SetCooperativeLevel(Window, DSSCL_PRIORITY) == DS_OK)
+                {
+                    DSBUFFERDESC PrimaryBufferDescription = {};
+                    PrimaryBufferDescription.dwSize = sizeof(PrimaryBufferDescription);
+                    PrimaryBufferDescription.dwFlags = DSBCAPS_PRIMARYBUFFER;
+
+                    LPDIRECTSOUNDBUFFER PrimaryBuffer;
+                    if (DirectSound->CreateSoundBuffer(&PrimaryBufferDescription, &PrimaryBuffer, 0) == DS_OK)
+                    {
+                        OutputDebugStringA("Created the primary buffer.\n");
+
+                        // TODO(joe): Maybe reduce the number of named variables here?
+                        WORD Channels = 2;
+                        WORD BitsPerSample = 16;
+                        DWORD SamplesPerSec = 44100;
+                        WORD BlockAlign = (Channels * BitsPerSample) / 8;
+                        DWORD AvgBytesPerSec = SamplesPerSec * BlockAlign;
+
+                        WAVEFORMATEX Format = {};
+                        Format.wFormatTag = WAVE_FORMAT_PCM;
+                        Format.nChannels = Channels;
+                        Format.wBitsPerSample = BitsPerSample;
+                        Format.nSamplesPerSec = SamplesPerSec;
+                        Format.nBlockAlign = BlockAlign;
+                        Format.nAvgBytesPerSec = AvgBytesPerSec;
+
+                        PrimaryBuffer->SetFormat(&Format);
+
+                        DSBUFFERDESC SecondaryBufferDescription = {};
+                        SecondaryBufferDescription.dwSize = sizeof(SecondaryBufferDescription);
+                        //SecondaryBufferDescription.dwFlags = 0;
+                        SecondaryBufferDescription.dwBufferBytes = 2 * AvgBytesPerSec;
+                        SecondaryBufferDescription.lpwfxFormat = &Format;
+
+                        LPDIRECTSOUNDBUFFER SecondaryBuffer;
+                        HRESULT SecondaryBufferResult = DirectSound->CreateSoundBuffer(&SecondaryBufferDescription, &SecondaryBuffer, 0);
+                        if (SecondaryBufferResult == DS_OK)
+                        {
+                            OutputDebugStringA("Created the secondary buffer.\n");
+                        }
+                        else
+                        {
+                            // TODO(joe): Diagnostics for when we can't create the primary buffer.
+                        }
+                    }
+                    else
+                    {
+                        // TODO(joe): Diagnostics for when we can't create the primary buffer.
+                    }
+                }
+                else
+                {
+                    // TODO(joe): Handle failing to set the cooperative level.
+                }
+            }
+            else
+            {
+                // TODO(joe): Handle when the sound cannot be initialized.
+            }
+
             GlobalGameState.OffsetX = 0;
             GlobalGameState.OffsetY = 0;
-
 
             LARGE_INTEGER PerformanceFrequencyCountPerSecond;
             QueryPerformanceFrequency(&PerformanceFrequencyCountPerSecond);
@@ -219,9 +283,11 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                 float MSPerFrame = (float)ElapsedCount.QuadPart / PerformanceFrequencyCountPerSecond.QuadPart;
                 float FPS = 1000.0f / MSPerFrame;
 
+#if 0
                 char FrameTimeString[255];
                 snprintf(FrameTimeString, 255, "MSPF: %.2f FPS: %.2f \n", MSPerFrame, FPS);
                 OutputDebugStringA(FrameTimeString);
+#endif
                 LastFrameCount = FrameCount;
             }
         }
