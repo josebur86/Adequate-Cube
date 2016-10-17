@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <dsound.h>
 
+#include <cassert>
 #include <cstdint>
 #include <cstdio>
 
@@ -124,6 +125,12 @@ static LRESULT CALLBACK Win32MainCallWindowCallback(HWND Window, UINT Message, W
     return Result;
 }
 
+struct win32_sound_system
+{
+    LPDIRECTSOUNDBUFFER PrimaryBuffer;
+    LPDIRECTSOUNDBUFFER SecondaryBuffer;
+};
+
 int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLine, int ShowCode)
 {
     WNDCLASSA WindowClass = {};
@@ -150,6 +157,8 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
         if (Window)
         {
             Win32ResizeBackBuffer(&GlobalBackBuffer, 960, 540);
+            
+            win32_sound_system SoundSystem = {};
 
             // Create the primary buffer
             LPDIRECTSOUND DirectSound; 
@@ -161,8 +170,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                     PrimaryBufferDescription.dwSize = sizeof(PrimaryBufferDescription);
                     PrimaryBufferDescription.dwFlags = DSBCAPS_PRIMARYBUFFER;
 
-                    LPDIRECTSOUNDBUFFER PrimaryBuffer;
-                    if (DirectSound->CreateSoundBuffer(&PrimaryBufferDescription, &PrimaryBuffer, 0) == DS_OK)
+                    if (DirectSound->CreateSoundBuffer(&PrimaryBufferDescription, &SoundSystem.PrimaryBuffer, 0) == DS_OK)
                     {
                         OutputDebugStringA("Created the primary buffer.\n");
 
@@ -181,18 +189,19 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                         Format.nBlockAlign = BlockAlign;
                         Format.nAvgBytesPerSec = AvgBytesPerSec;
 
-                        PrimaryBuffer->SetFormat(&Format);
+                        SoundSystem.PrimaryBuffer->SetFormat(&Format);
 
                         DSBUFFERDESC SecondaryBufferDescription = {};
                         SecondaryBufferDescription.dwSize = sizeof(SecondaryBufferDescription);
                         //SecondaryBufferDescription.dwFlags = 0;
-                        SecondaryBufferDescription.dwBufferBytes = 2 * AvgBytesPerSec;
+                        SecondaryBufferDescription.dwBufferBytes = AvgBytesPerSec;
                         SecondaryBufferDescription.lpwfxFormat = &Format;
 
                         LPDIRECTSOUNDBUFFER SecondaryBuffer;
-                        HRESULT SecondaryBufferResult = DirectSound->CreateSoundBuffer(&SecondaryBufferDescription, &SecondaryBuffer, 0);
+                        HRESULT SecondaryBufferResult = DirectSound->CreateSoundBuffer(&SecondaryBufferDescription, &SoundSystem.SecondaryBuffer, 0);
                         if (SecondaryBufferResult == DS_OK)
                         {
+                            HRESULT PlayResult = SoundSystem.SecondaryBuffer->Play(0, 0, DSBPLAY_LOOPING);
                             OutputDebugStringA("Created the secondary buffer.\n");
                         }
                         else
@@ -274,6 +283,52 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                 HDC DeviceContext = GetDC(Window);
                 Win32PaintBackBuffer(DeviceContext, &GlobalBackBuffer);
 
+                DWORD PlayCursor = 0;
+                DWORD WriteCursor = 0;
+                SoundSystem.SecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor);
+                char SoundCursorString[255];
+                snprintf(SoundCursorString, 255, "Play Cursor: %i Write Cursor: %i \n", PlayCursor, WriteCursor);
+                OutputDebugStringA(SoundCursorString);
+
+                // TODO(joe): Instead of using BytesPerFrame, just fill in the buffer with a static wave.
+                // Start from the last byte that we wrote (mapped into the circular buffer) and write up
+                // until the play cursor.
+                DWORD BytesPerFrame = 2940;
+                void *AudioPointer1 = 0;
+                DWORD AudioBytes1 = 0;
+                void *AudioPointer2 = 0;
+                DWORD AudioBytes2 = 0;
+                // TODO(joe): Assert that the AudioBytes1/AudioBytes2 are valid.
+                // Valid in this case means that they are an even multiple of the samples.
+                SoundSystem.SecondaryBuffer->Lock(0, BytesPerFrame, 
+                                                  &AudioPointer1, &AudioBytes1, 
+                                                  &AudioPointer2, &AudioBytes2, 
+                                                  DSBLOCK_FROMWRITECURSOR); 
+                // TODO(joe): HMH example doesn't use any flags...He just writes
+                //           from the write cursor enough bytes so that it would
+                //           catch up the play cursor. He handles the case where
+                //           the play cursor has wrapped.
+                bool WrapAround = AudioBytes1 != BytesPerFrame;
+                DWORD AudioBytesWritten1 = 0;
+                DWORD AudioBytesWritten2 = 0;
+
+                if (!WrapAround)
+                {
+                    uint16_t *Samples = (uint16_t *)AudioPointer1;
+                    uint16_t *SamplesHead = Samples;
+                    int SamplesToWrite = AudioBytes1 / 2;
+                    int SamplesWritten = 0;
+                    while (SamplesWritten < SamplesToWrite)
+                    {
+                        *Samples++ = 3000; 
+                        ++SamplesWritten;
+                    }
+
+                    assert(SamplesWritten == SamplesToWrite);
+                    AudioBytesWritten1 = SamplesWritten * 2;
+                }
+                SoundSystem.SecondaryBuffer->Unlock(AudioPointer1, AudioBytesWritten1, AudioPointer2, AudioBytesWritten2);
+        
                 QueryPerformanceCounter(&PerformanceCount);
                 uint64_t FrameCount = PerformanceCount.QuadPart;
 
