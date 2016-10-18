@@ -5,6 +5,16 @@
 #include <cstdint>
 #include <cstdio>
 
+typedef int8_t int8;
+typedef int16_t int16;
+typedef int32_t int32;
+typedef int64_t int64;
+
+typedef uint8_t uint8;
+typedef uint16_t uint16;
+typedef uint32_t uint32;
+typedef uint64_t uint64;
+
 struct win32_back_buffer
 {
     BITMAPINFO Info;
@@ -73,14 +83,14 @@ static void Win32PaintBackBuffer(HDC DeviceContext, win32_back_buffer *BackBuffe
 
 static void Update(win32_back_buffer *BackBuffer, game_state GameState)
 {
-    int32_t *Pixel = (int32_t *)BackBuffer->Memory;        
+    int32 *Pixel = (int32 *)BackBuffer->Memory;        
     for (int YIndex = 0; YIndex < BackBuffer->Height; ++YIndex)
     {
         for (int XIndex = 0; XIndex < BackBuffer->Width; ++XIndex)
         {
-            uint8_t b = GameState.OffsetX + XIndex;
-            uint8_t g = GameState.OffsetY + YIndex;
-            uint8_t r = GameState.OffsetX + XIndex + GameState.OffsetY + YIndex;
+            uint8 b = GameState.OffsetX + XIndex;
+            uint8 g = GameState.OffsetY + YIndex;
+            uint8 r = GameState.OffsetX + XIndex + GameState.OffsetY + YIndex;
             *Pixel++ = (b << 0 | g << 8 | r << 16);
         }
     }
@@ -222,14 +232,14 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
             GlobalGameState.OffsetY = 0;
 
             // Sound Test Parameters.
-            uint32_t RunningSamples = 0;
+            uint32 RunningSamples = 0;
 
             LARGE_INTEGER PerformanceFrequencyCountPerSecond;
             QueryPerformanceFrequency(&PerformanceFrequencyCountPerSecond);
 
             LARGE_INTEGER PerformanceCount;
             QueryPerformanceCounter(&PerformanceCount);
-            int64_t LastFrameCount = PerformanceCount.QuadPart;
+            int64 LastFrameCount = PerformanceCount.QuadPart;
             GlobalRunning = true;
             while(GlobalRunning)
             {
@@ -245,7 +255,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                         } break;
                         case WM_KEYDOWN:
                         {
-                            uint32_t KeyCode = (uint32_t)Message.wParam;
+                            uint32 KeyCode = (uint32)Message.wParam;
 
                             // TODO(joe): The processing of key presses should
                             // not happen here. This should only translate
@@ -282,7 +292,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
 
                 // NOTE(joe): DirectSound test code.
                 int BytesPerSample = 4; // NOTE(joe): 2 channels, 2 bytes each = 4 bytes total.
-                int16_t ToneVolume = 1600;
+                int16 ToneVolume = 1600;
                 int ToneHz = 256; // Periods per second
                 int TonePeriod = SamplesPerSec / ToneHz; // samples
                 int HalfTonePeriod = TonePeriod / 2;
@@ -321,19 +331,19 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                         OutputDebugStringA(SoundCursorString);
 #endif
 
-                        int16_t *Sample = (int16_t *)AudioPointer1;
+                        int16 *Sample = (int16 *)AudioPointer1;
                         int SamplesToWrite1 = AudioBytes1 / BytesPerSample;
                         for (int SampleIndex = 0; SampleIndex < SamplesToWrite1; ++SampleIndex)
                         {
-                            uint16_t ToneValue = ((RunningSamples++ / HalfTonePeriod) % 2) ? -ToneVolume : ToneVolume;
+                            uint16 ToneValue = ((RunningSamples++ / HalfTonePeriod) % 2) ? -ToneVolume : ToneVolume;
                             *Sample++ = ToneValue; // Left
                             *Sample++ = ToneValue; // Right
                         }
-                        Sample = (int16_t *)AudioPointer2;
+                        Sample = (int16 *)AudioPointer2;
                         int SamplesToWrite2 = AudioBytes2 / BytesPerSample;
                         for (int SampleIndex = 0; SampleIndex < SamplesToWrite2; ++SampleIndex)
                         {
-                            uint16_t ToneValue = ((RunningSamples++ / HalfTonePeriod) % 2) ? -ToneVolume : ToneVolume;
+                            uint16 ToneValue = ((RunningSamples++ / HalfTonePeriod) % 2) ? -ToneVolume : ToneVolume;
                             *Sample++ = ToneValue; // Left
                             *Sample++ = ToneValue; // Right
                         }
@@ -343,7 +353,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                 }
         
                 QueryPerformanceCounter(&PerformanceCount);
-                uint64_t FrameCount = PerformanceCount.QuadPart;
+                uint64 FrameCount = PerformanceCount.QuadPart;
 
                 LARGE_INTEGER ElapsedCount;
                 ElapsedCount.QuadPart = FrameCount - LastFrameCount;
