@@ -2,8 +2,11 @@
 #include <dsound.h>
 
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
+
+#define PI32 3.14159265359f
 
 typedef int8_t int8;
 typedef int16_t int16;
@@ -25,10 +28,25 @@ struct win32_back_buffer
     int BytesPerPixel;
 };
 
+struct win32_sound_output
+{
+    DWORD BytesPerSample;
+    WORD SamplesPerSec;
+    DWORD BufferSize;
+
+    uint32 RunningSamples;
+    int LatencySampleCount;
+    int WavePeriod;
+    float tSine;
+    int16 ToneVolume;
+};
+
 struct game_state
 {
     int OffsetX;
     int OffsetY;
+
+    int ToneHz;
 };
 
 static bool GlobalRunning = true;
@@ -79,6 +97,115 @@ static void Win32PaintBackBuffer(HDC DeviceContext, win32_back_buffer *BackBuffe
                   &BackBuffer->Info,
                   DIB_RGB_COLORS,
                   SRCCOPY);
+}
+
+static void InitSound(HWND Window, DWORD SamplesPerSec, DWORD BufferSize)
+{
+    DWORD Channels = 2;
+    WORD BitsPerSample = 16;
+    DWORD BlockAlign = Channels * (BitsPerSample / 8);
+    DWORD AvgBytesPerSec = SamplesPerSec * BlockAlign;
+
+    // Create the primary buffer
+    LPDIRECTSOUND DirectSound; 
+    if (DirectSoundCreate(NULL, &DirectSound, NULL) == DS_OK)
+    {
+        if (DirectSound->SetCooperativeLevel(Window, DSSCL_PRIORITY) == DS_OK)
+        {
+            DSBUFFERDESC PrimaryBufferDescription = {};
+            PrimaryBufferDescription.dwSize = sizeof(PrimaryBufferDescription);
+            PrimaryBufferDescription.dwFlags = DSBCAPS_PRIMARYBUFFER;
+
+            LPDIRECTSOUNDBUFFER PrimaryBuffer;
+            if (DirectSound->CreateSoundBuffer(&PrimaryBufferDescription, &PrimaryBuffer, 0) == DS_OK)
+            {
+                OutputDebugStringA("Created the primary buffer.\n");
+
+                WAVEFORMATEX Format = {};
+                Format.wFormatTag = WAVE_FORMAT_PCM;
+                Format.nChannels = Channels;
+                Format.wBitsPerSample = BitsPerSample;
+                Format.nSamplesPerSec = SamplesPerSec;
+                Format.nBlockAlign = BlockAlign;
+                Format.nAvgBytesPerSec = AvgBytesPerSec;
+
+                PrimaryBuffer->SetFormat(&Format);
+
+                DSBUFFERDESC SecondaryBufferDescription = {};
+                SecondaryBufferDescription.dwSize = sizeof(SecondaryBufferDescription);
+                //SecondaryBufferDescription.dwFlags = 0;
+                SecondaryBufferDescription.dwBufferBytes = BufferSize;
+                SecondaryBufferDescription.lpwfxFormat = &Format;
+
+                HRESULT SecondaryBufferResult = DirectSound->CreateSoundBuffer(&SecondaryBufferDescription, &GlobalSecondaryBuffer, 0);
+                if (SecondaryBufferResult == DS_OK)
+                {
+                    HRESULT PlayResult = GlobalSecondaryBuffer->Play(0, 0, DSBPLAY_LOOPING);
+                    OutputDebugStringA("Created the secondary buffer.\n");
+                }
+                else
+                {
+                    // TODO(joe): Diagnostics for when we can't create the primary buffer.
+                }
+            }
+            else
+            {
+                // TODO(joe): Diagnostics for when we can't create the primary buffer.
+            }
+        }
+        else
+        {
+            // TODO(joe): Handle failing to set the cooperative level.
+        }
+    }
+    else
+    {
+        // TODO(joe): Handle when the sound cannot be initialized.
+    }
+}
+
+static void Win32WriteToSoundBuffer(win32_sound_output *SoundOutput, DWORD ByteToLock, DWORD BytesToWrite)
+{
+    void *AudioPointer1 = 0;
+    DWORD AudioBytes1 = 0;
+    void *AudioPointer2 = 0;
+    DWORD AudioBytes2 = 0;
+    assert((AudioBytes1 / SoundOutput->BytesPerSample) == 0);
+    assert((AudioBytes2 / SoundOutput->BytesPerSample) == 0);
+    if (GlobalSecondaryBuffer->Lock(ByteToLock, BytesToWrite, 
+                &AudioPointer1, &AudioBytes1, 
+                &AudioPointer2, &AudioBytes2, 
+                0) == DS_OK)
+    {
+        int16 *Sample = (int16 *)AudioPointer1;
+        int SamplesToWrite1 = AudioBytes1 / SoundOutput->BytesPerSample;
+        for (int SampleIndex = 0; SampleIndex < SamplesToWrite1; ++SampleIndex)
+        {
+            float SineValue = sinf(SoundOutput->tSine);
+            uint16 ToneValue = (uint16)(SoundOutput->ToneVolume*SineValue);
+
+            *Sample++ = ToneValue; // Left
+            *Sample++ = ToneValue; // Right
+
+            ++SoundOutput->RunningSamples;
+            SoundOutput->tSine += 2*PI32 * 1.0f/(float)SoundOutput->WavePeriod;
+        }
+        Sample = (int16 *)AudioPointer2;
+        int SamplesToWrite2 = AudioBytes2 / SoundOutput->BytesPerSample;
+        for (int SampleIndex = 0; SampleIndex < SamplesToWrite2; ++SampleIndex)
+        {
+            float SineValue = sinf(SoundOutput->tSine);
+            uint16 ToneValue = (uint16)(SoundOutput->ToneVolume*SineValue);
+
+            *Sample++ = ToneValue; // Left
+            *Sample++ = ToneValue; // Right
+
+            ++SoundOutput->RunningSamples;
+            SoundOutput->tSine += 2*PI32 * 1.0f/(float)SoundOutput->WavePeriod;
+        }
+
+        GlobalSecondaryBuffer->Unlock(AudioPointer1, AudioBytes1, AudioPointer2, AudioBytes2);
+    }
 }
 
 static void Update(win32_back_buffer *BackBuffer, game_state GameState)
@@ -161,79 +288,22 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                                       0);
         if (Window)
         {
-            Win32ResizeBackBuffer(&GlobalBackBuffer, 960, 540);
-
-            // TODO(joe): Maybe reduce the number of named variables here?
-            WORD Channels = 2;
-            WORD BitsPerSample = 16;
-            DWORD SamplesPerSec = 44100;
-            WORD BlockAlign = (Channels * BitsPerSample) / 8;
-            DWORD AvgBytesPerSec = SamplesPerSec * BlockAlign;
-            DWORD BufferSize = 2 * AvgBytesPerSec;
-            
-            // Create the primary buffer
-            LPDIRECTSOUND DirectSound; 
-            if (DirectSoundCreate(NULL, &DirectSound, NULL) == DS_OK)
-            {
-                if (DirectSound->SetCooperativeLevel(Window, DSSCL_PRIORITY) == DS_OK)
-                {
-                    DSBUFFERDESC PrimaryBufferDescription = {};
-                    PrimaryBufferDescription.dwSize = sizeof(PrimaryBufferDescription);
-                    PrimaryBufferDescription.dwFlags = DSBCAPS_PRIMARYBUFFER;
-
-                    LPDIRECTSOUNDBUFFER PrimaryBuffer;
-                    if (DirectSound->CreateSoundBuffer(&PrimaryBufferDescription, &PrimaryBuffer, 0) == DS_OK)
-                    {
-                        OutputDebugStringA("Created the primary buffer.\n");
-
-                        WAVEFORMATEX Format = {};
-                        Format.wFormatTag = WAVE_FORMAT_PCM;
-                        Format.nChannels = Channels;
-                        Format.wBitsPerSample = BitsPerSample;
-                        Format.nSamplesPerSec = SamplesPerSec;
-                        Format.nBlockAlign = BlockAlign;
-                        Format.nAvgBytesPerSec = AvgBytesPerSec;
-
-                        PrimaryBuffer->SetFormat(&Format);
-
-                        DSBUFFERDESC SecondaryBufferDescription = {};
-                        SecondaryBufferDescription.dwSize = sizeof(SecondaryBufferDescription);
-                        //SecondaryBufferDescription.dwFlags = 0;
-                        SecondaryBufferDescription.dwBufferBytes = BufferSize;
-                        SecondaryBufferDescription.lpwfxFormat = &Format;
-
-                        HRESULT SecondaryBufferResult = DirectSound->CreateSoundBuffer(&SecondaryBufferDescription, &GlobalSecondaryBuffer, 0);
-                        if (SecondaryBufferResult == DS_OK)
-                        {
-                            HRESULT PlayResult = GlobalSecondaryBuffer->Play(0, 0, DSBPLAY_LOOPING);
-                            OutputDebugStringA("Created the secondary buffer.\n");
-                        }
-                        else
-                        {
-                            // TODO(joe): Diagnostics for when we can't create the primary buffer.
-                        }
-                    }
-                    else
-                    {
-                        // TODO(joe): Diagnostics for when we can't create the primary buffer.
-                    }
-                }
-                else
-                {
-                    // TODO(joe): Handle failing to set the cooperative level.
-                }
-            }
-            else
-            {
-                // TODO(joe): Handle when the sound cannot be initialized.
-            }
-
             GlobalGameState.OffsetX = 0;
             GlobalGameState.OffsetY = 0;
+            GlobalGameState.ToneHz = 256;
 
-            // Sound Test Parameters.
-            uint32 RunningSamples = 0;
+            Win32ResizeBackBuffer(&GlobalBackBuffer, 960, 540);
 
+            win32_sound_output SoundOutput = {};
+            SoundOutput.SamplesPerSec = 44100;
+            SoundOutput.BytesPerSample = 2*sizeof(int16);
+            SoundOutput.BufferSize = SoundOutput.SamplesPerSec * SoundOutput.BytesPerSample;
+            SoundOutput.LatencySampleCount = SoundOutput.SamplesPerSec / 15;
+
+            SoundOutput.ToneVolume = 1600;
+            SoundOutput.WavePeriod = SoundOutput.SamplesPerSec / GlobalGameState.ToneHz; // samples
+            InitSound(Window, SoundOutput.SamplesPerSec, SoundOutput.BufferSize);
+            
             LARGE_INTEGER PerformanceFrequencyCountPerSecond;
             QueryPerformanceFrequency(&PerformanceFrequencyCountPerSecond);
 
@@ -264,10 +334,14 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                             if (KeyCode == 'W')
                             {
                                 GlobalGameState.OffsetY -= 10;
+                                GlobalGameState.ToneHz += 10;
+                                SoundOutput.WavePeriod = SoundOutput.SamplesPerSec / GlobalGameState.ToneHz;
                             }
                             else if (KeyCode == 'S')
                             {
                                 GlobalGameState.OffsetY += 10;
+                                GlobalGameState.ToneHz -= 10;
+                                SoundOutput.WavePeriod = SoundOutput.SamplesPerSec / GlobalGameState.ToneHz;
                             }
                             else if (KeyCode == 'A')
                             {
@@ -290,66 +364,27 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                 HDC DeviceContext = GetDC(Window);
                 Win32PaintBackBuffer(DeviceContext, &GlobalBackBuffer);
 
-                // NOTE(joe): DirectSound test code.
-                int BytesPerSample = 4; // NOTE(joe): 2 channels, 2 bytes each = 4 bytes total.
-                int16 ToneVolume = 1600;
-                int ToneHz = 256; // Periods per second
-                int TonePeriod = SamplesPerSec / ToneHz; // samples
-                int HalfTonePeriod = TonePeriod / 2;
-
                 DWORD PlayCursor = 0;
                 DWORD WriteCursor = 0;
                 if (GlobalSecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor) == DS_OK)
                 {
-                    DWORD ByteToLock = (RunningSamples * BytesPerSample) % BufferSize;
+                    DWORD ByteToLock = (SoundOutput.RunningSamples * SoundOutput.BytesPerSample) % SoundOutput.BufferSize;
+                    DWORD TargetCursor = (PlayCursor + (SoundOutput.LatencySampleCount * SoundOutput.BytesPerSample)) % SoundOutput.BufferSize;
                     DWORD BytesToWrite = 0;
-                    if (ByteToLock > PlayCursor)
+                    if (ByteToLock > TargetCursor)
                     {
-                        BytesToWrite = (BufferSize - ByteToLock) + PlayCursor;
+                        BytesToWrite = (SoundOutput.BufferSize - ByteToLock) + TargetCursor;
                     }
                     else
                     {
-                        BytesToWrite = PlayCursor - ByteToLock;
+                        BytesToWrite = TargetCursor - ByteToLock;
                     }
-                    
-                    void *AudioPointer1 = 0;
-                    DWORD AudioBytes1 = 0;
-                    void *AudioPointer2 = 0;
-                    DWORD AudioBytes2 = 0;
-                    // TODO(joe): Assert that the AudioBytes1/AudioBytes2 are valid.
-                    // Valid in this case means that they are an even multiple of the samples.
-                    assert((AudioBytes1 / BytesPerSample) == 0);
-                    assert((AudioBytes2 / BytesPerSample) == 0);
-                    if (GlobalSecondaryBuffer->Lock(ByteToLock, BytesToWrite, 
-                                                    &AudioPointer1, &AudioBytes1, 
-                                                    &AudioPointer2, &AudioBytes2, 
-                                                    0) == DS_OK)
-                    {
 #if 0
-                        char SoundCursorString[255];
-                        snprintf(SoundCursorString, 255, "Play Cursor: %i RunningSamples: %i ByteToLock: %i BytesToWrite: %i\n", PlayCursor, RunningSamples, ByteToLock, BytesToWrite);
-                        OutputDebugStringA(SoundCursorString);
+                    char SoundCursorString[255];
+                    snprintf(SoundCursorString, 255, "Play Cursor: %i RunningSamples: %i ByteToLock: %i BytesToWrite: %i\n", PlayCursor, SoundOutput.RunningSamples, ByteToLock, BytesToWrite);
+                    OutputDebugStringA(SoundCursorString);
 #endif
-
-                        int16 *Sample = (int16 *)AudioPointer1;
-                        int SamplesToWrite1 = AudioBytes1 / BytesPerSample;
-                        for (int SampleIndex = 0; SampleIndex < SamplesToWrite1; ++SampleIndex)
-                        {
-                            uint16 ToneValue = ((RunningSamples++ / HalfTonePeriod) % 2) ? -ToneVolume : ToneVolume;
-                            *Sample++ = ToneValue; // Left
-                            *Sample++ = ToneValue; // Right
-                        }
-                        Sample = (int16 *)AudioPointer2;
-                        int SamplesToWrite2 = AudioBytes2 / BytesPerSample;
-                        for (int SampleIndex = 0; SampleIndex < SamplesToWrite2; ++SampleIndex)
-                        {
-                            uint16 ToneValue = ((RunningSamples++ / HalfTonePeriod) % 2) ? -ToneVolume : ToneVolume;
-                            *Sample++ = ToneValue; // Left
-                            *Sample++ = ToneValue; // Right
-                        }
-
-                        GlobalSecondaryBuffer->Unlock(AudioPointer1, AudioBytes1, AudioPointer2, AudioBytes2);
-                    }
+                    Win32WriteToSoundBuffer(&SoundOutput, ByteToLock, BytesToWrite);
                 }
         
                 QueryPerformanceCounter(&PerformanceCount);
