@@ -107,6 +107,7 @@ static void InitSound(HWND Window, DWORD SamplesPerSec, DWORD BufferSize)
     DWORD AvgBytesPerSec = SamplesPerSec * BlockAlign;
 
     // Create the primary buffer
+    // Note(joe): This call can fail if there isn't an audio device at startup.
     LPDIRECTSOUND DirectSound; 
     if (DirectSoundCreate(NULL, &DirectSound, NULL) == DS_OK)
     {
@@ -366,7 +367,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
 
                 DWORD PlayCursor = 0;
                 DWORD WriteCursor = 0;
-                if (GlobalSecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor) == DS_OK)
+                if (GlobalSecondaryBuffer && GlobalSecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor) == DS_OK)
                 {
                     DWORD ByteToLock = (SoundOutput.RunningSamples * SoundOutput.BytesPerSample) % SoundOutput.BufferSize;
                     DWORD TargetCursor = (PlayCursor + (SoundOutput.LatencySampleCount * SoundOutput.BytesPerSample)) % SoundOutput.BufferSize;
