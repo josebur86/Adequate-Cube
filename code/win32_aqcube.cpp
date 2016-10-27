@@ -209,6 +209,15 @@ static void Win32WriteToSoundBuffer(win32_sound_output *SoundOutput, DWORD ByteT
     }
 }
 
+static float GetElapsedMS(uint64 Before, uint64 After, uint64 PerformanceFrequencyCountPerSecond)
+{
+    LARGE_INTEGER ElapsedCount;
+    ElapsedCount.QuadPart = After - Before;
+    ElapsedCount.QuadPart *= 1000;
+    float Result = (float)ElapsedCount.QuadPart / PerformanceFrequencyCountPerSecond;
+    return Result;
+}
+
 static void Update(win32_back_buffer *BackBuffer, game_state GameState)
 {
     int32 *Pixel = (int32 *)BackBuffer->Memory;        
@@ -304,6 +313,12 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
             SoundOutput.ToneVolume = 1600;
             SoundOutput.WavePeriod = SoundOutput.SamplesPerSec / GlobalGameState.ToneHz; // samples
             InitSound(Window, SoundOutput.SamplesPerSec, SoundOutput.BufferSize);
+
+            UINT TimerResolutionMS = 1;
+            timeBeginPeriod(TimerResolutionMS);
+
+#define FRAMES_PER_SECOND 30
+#define FRAME_MS 1000 / FRAMES_PER_SECOND
             
             LARGE_INTEGER PerformanceFrequencyCountPerSecond;
             QueryPerformanceFrequency(&PerformanceFrequencyCountPerSecond);
@@ -390,14 +405,20 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
         
                 QueryPerformanceCounter(&PerformanceCount);
                 uint64 FrameCount = PerformanceCount.QuadPart;
-
-                LARGE_INTEGER ElapsedCount;
-                ElapsedCount.QuadPart = FrameCount - LastFrameCount;
-                ElapsedCount.QuadPart *= 1000;
-                float MSPerFrame = (float)ElapsedCount.QuadPart / PerformanceFrequencyCountPerSecond.QuadPart;
+                float MSPerFrame = GetElapsedMS(LastFrameCount, FrameCount, PerformanceFrequencyCountPerSecond.QuadPart);
+                uint32 ElapsedTime = (uint32)MSPerFrame;
+                while (ElapsedTime < FRAME_MS)
+                {
+                    Sleep(FRAME_MS - ElapsedTime);
+                    
+                    QueryPerformanceCounter(&PerformanceCount);
+                    FrameCount = PerformanceCount.QuadPart;
+                    MSPerFrame = GetElapsedMS(LastFrameCount, FrameCount, PerformanceFrequencyCountPerSecond.QuadPart);
+                    ElapsedTime = (uint32)MSPerFrame;
+                }
                 float FPS = 1000.0f / MSPerFrame;
 
-#if 0
+#if 1
                 char FrameTimeString[255];
                 snprintf(FrameTimeString, 255, "MSPF: %.2f FPS: %.2f \n", MSPerFrame, FPS);
                 OutputDebugStringA(FrameTimeString);
