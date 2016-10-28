@@ -53,6 +53,7 @@ static bool GlobalRunning = true;
 static win32_back_buffer GlobalBackBuffer;
 static LPDIRECTSOUNDBUFFER GlobalSecondaryBuffer;
 game_state GlobalGameState;
+static LARGE_INTEGER GlobalPerfFrequencyCount;
 
 static void Win32ResizeBackBuffer(win32_back_buffer *Buffer, int Width, int Height)
 {
@@ -209,12 +210,17 @@ static void Win32WriteToSoundBuffer(win32_sound_output *SoundOutput, DWORD ByteT
     }
 }
 
-static float GetElapsedMS(uint64 Before, uint64 After, uint64 PerformanceFrequencyCountPerSecond)
+inline static LARGE_INTEGER Win32GetClock()
 {
-    LARGE_INTEGER ElapsedCount;
-    ElapsedCount.QuadPart = After - Before;
-    ElapsedCount.QuadPart *= 1000;
-    float Result = (float)ElapsedCount.QuadPart / PerformanceFrequencyCountPerSecond;
+    LARGE_INTEGER Result;
+    QueryPerformanceCounter(&Result);
+    return Result;
+}
+
+inline static float Win32GetElapsedSeconds(LARGE_INTEGER Start, LARGE_INTEGER End)
+{
+    float Result = ((float)(End.QuadPart - Start.QuadPart)) / 
+                    (float)GlobalPerfFrequencyCount.QuadPart;
     return Result;
 }
 
@@ -302,6 +308,8 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
             GlobalGameState.OffsetY = 0;
             GlobalGameState.ToneHz = 256;
 
+            QueryPerformanceFrequency(&GlobalPerfFrequencyCount);
+
             Win32ResizeBackBuffer(&GlobalBackBuffer, 960, 540);
 
             win32_sound_output SoundOutput = {};
@@ -315,17 +323,13 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
             InitSound(Window, SoundOutput.SamplesPerSec, SoundOutput.BufferSize);
 
             UINT TimerResolutionMS = 1;
-            timeBeginPeriod(TimerResolutionMS);
+            bool TimeIsGranular = timeBeginPeriod(TimerResolutionMS) == TIMERR_NOERROR;
 
-#define FRAMES_PER_SECOND 30
-#define FRAME_MS 1000 / FRAMES_PER_SECOND
+            int MonitorHz = 60;
+            int GameUpdateHz = 30;
+            float TargetFrameSeconds = 1.0f / (float)GameUpdateHz;
             
-            LARGE_INTEGER PerformanceFrequencyCountPerSecond;
-            QueryPerformanceFrequency(&PerformanceFrequencyCountPerSecond);
-
-            LARGE_INTEGER PerformanceCount;
-            QueryPerformanceCounter(&PerformanceCount);
-            int64 LastFrameCount = PerformanceCount.QuadPart;
+            LARGE_INTEGER LastFrameCount = Win32GetClock();
             GlobalRunning = true;
             while(GlobalRunning)
             {
@@ -376,9 +380,6 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                     }
                 }
 
-                Update(&GlobalBackBuffer, GlobalGameState);
-                HDC DeviceContext = GetDC(Window);
-                Win32PaintBackBuffer(DeviceContext, &GlobalBackBuffer);
 
                 DWORD PlayCursor = 0;
                 DWORD WriteCursor = 0;
@@ -402,28 +403,46 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
 #endif
                     Win32WriteToSoundBuffer(&SoundOutput, ByteToLock, BytesToWrite);
                 }
-        
-                QueryPerformanceCounter(&PerformanceCount);
-                uint64 FrameCount = PerformanceCount.QuadPart;
-                float MSPerFrame = GetElapsedMS(LastFrameCount, FrameCount, PerformanceFrequencyCountPerSecond.QuadPart);
-                uint32 ElapsedTime = (uint32)MSPerFrame;
-                while (ElapsedTime < FRAME_MS)
+
+                Update(&GlobalBackBuffer, GlobalGameState);
+                
+                LARGE_INTEGER FrameCount = Win32GetClock();
+                float ElapsedTime = Win32GetElapsedSeconds(LastFrameCount, FrameCount);
+                if (ElapsedTime < TargetFrameSeconds)
                 {
-                    Sleep(FRAME_MS - ElapsedTime);
+                    DWORD TimeToSleep = (DWORD)(1000.0f * (TargetFrameSeconds - ElapsedTime));
+                    if (TimeIsGranular)
+                    {
+                        if (TimeToSleep > 0)
+                        {
+                            Sleep(TimeToSleep);
+                        }
+                    }
                     
-                    QueryPerformanceCounter(&PerformanceCount);
-                    FrameCount = PerformanceCount.QuadPart;
-                    MSPerFrame = GetElapsedMS(LastFrameCount, FrameCount, PerformanceFrequencyCountPerSecond.QuadPart);
-                    ElapsedTime = (uint32)MSPerFrame;
+                    ElapsedTime = Win32GetElapsedSeconds(LastFrameCount, Win32GetClock());
+                    while (ElapsedTime < TargetFrameSeconds)
+                    {
+                       ElapsedTime = Win32GetElapsedSeconds(LastFrameCount, Win32GetClock());
+                    }
                 }
-                float FPS = 1000.0f / MSPerFrame;
+                else
+                {
+                    // TODO(joe): Log that we missed a frame.
+                }
+
+                LARGE_INTEGER EndCount = Win32GetClock();
 
 #if 1
                 char FrameTimeString[255];
+                float MSPerFrame = 1000.0f * Win32GetElapsedSeconds(LastFrameCount, EndCount);
+                float FPS = 1000.0f / MSPerFrame;
                 snprintf(FrameTimeString, 255, "MSPF: %.2f FPS: %.2f \n", MSPerFrame, FPS);
                 OutputDebugStringA(FrameTimeString);
 #endif
-                LastFrameCount = FrameCount;
+                LastFrameCount = EndCount;
+
+                HDC DeviceContext = GetDC(Window);
+                Win32PaintBackBuffer(DeviceContext, &GlobalBackBuffer);
             }
         }
     }
