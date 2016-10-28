@@ -436,7 +436,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                 char FrameTimeString[255];
                 float MSPerFrame = 1000.0f * Win32GetElapsedSeconds(LastFrameCount, EndCount);
                 float FPS = 1000.0f / MSPerFrame;
-                snprintf(FrameTimeString, 255, "MSPF: %.2f FPS: %.2f \n", MSPerFrame, FPS);
+                snprintf(FrameTimeString, 255, "ms/f: %.2f f/s: %.2f \n", MSPerFrame, FPS);
                 OutputDebugStringA(FrameTimeString);
 #endif
                 LastFrameCount = EndCount;
