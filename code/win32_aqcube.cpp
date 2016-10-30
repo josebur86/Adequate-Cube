@@ -441,6 +441,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
 
                 UpdateGameAndRender(&BackBuffer, &GlobalGameState);
                 
+#if 0
                 LARGE_INTEGER FrameCount = Win32GetClock();
                 float ElapsedTime = Win32GetElapsedSeconds(LastFrameCount, FrameCount);
                 if (ElapsedTime < TargetFrameSeconds)
@@ -464,6 +465,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                 {
                     // TODO(joe): Log that we missed a frame.
                 }
+#endif
 
                 LARGE_INTEGER EndCount = Win32GetClock();
 
