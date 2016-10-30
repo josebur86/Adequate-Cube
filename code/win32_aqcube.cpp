@@ -279,6 +279,74 @@ static LRESULT CALLBACK Win32MainCallWindowCallback(HWND Window, UINT Message, W
     return Result;
 }
 
+struct button_state
+{
+    bool IsDown;
+};
+
+struct game_controller_input
+{
+    button_state Up;
+    button_state Down;
+    button_state Left;
+    button_state Right;
+};
+
+static void Win32ProcessButtonState(button_state *Button, bool IsDown)
+{
+    assert(Button->IsDown != IsDown);
+    Button->IsDown = IsDown;
+}
+
+static void Win32ProcessPendingMessages(game_controller_input *Input)
+{
+    // Process the message pump.
+    MSG Message;
+    while(PeekMessage(&Message, 0, 0, 0, PM_REMOVE))
+    {
+        switch(Message.message)
+        {
+            case WM_QUIT:
+                {
+                    GlobalRunning = false;
+                } break;
+            case WM_KEYUP:
+            case WM_KEYDOWN:
+                {
+                    uint32 KeyCode = (uint32)Message.wParam;
+                    bool IsDown = ((Message.lParam & (1 << 31)) == 0);
+                    bool WasDown = ((Message.lParam & (1 << 30)) != 0);
+
+                    if (IsDown != WasDown)
+                    {
+                        if (KeyCode == 'W')
+                        {
+                            Win32ProcessButtonState(&Input->Up, IsDown);
+                        }
+                        else if (KeyCode == 'S')
+                        {
+                            Win32ProcessButtonState(&Input->Down, IsDown);
+                        }
+                        else if (KeyCode == 'A')
+                        {
+                            Win32ProcessButtonState(&Input->Left, IsDown);
+                        }
+                        else if (KeyCode == 'D')
+                        {
+                            Win32ProcessButtonState(&Input->Right, IsDown);
+                        }
+                    }
+                } break;
+            default:
+                {
+                    TranslateMessage(&Message);
+                    DispatchMessageA(&Message);
+                } break;
+        }
+    }
+}
+
+
 int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLine, int ShowCode)
 {
     WNDCLASSA WindowClass = {};
@@ -329,57 +397,37 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
             int GameUpdateHz = 30;
             float TargetFrameSeconds = 1.0f / (float)GameUpdateHz;
             
+            game_controller_input Input = {};
+
             LARGE_INTEGER LastFrameCount = Win32GetClock();
             GlobalRunning = true;
             while(GlobalRunning)
             {
-                // Process the message pump.
-                MSG Message;
-                while(PeekMessage(&Message, 0, 0, 0, PM_REMOVE))
+                Win32ProcessPendingMessages(&Input);
+
+                // TODO(joe): Input handling is something that should happen
+                // outside of the platform layer. Move this to the game
+                // layer when it is available.
+                if (Input.Up.IsDown)
                 {
-                    switch(Message.message)
-                    {
-                        case WM_QUIT:
-                        {
-                            GlobalRunning = false;
-                        } break;
-                        case WM_KEYDOWN:
-                        {
-                            uint32 KeyCode = (uint32)Message.wParam;
-
-                            // TODO(joe): The processing of key presses should
-                            // not happen here. This should only translate
-                            // keypresses into user input for the game to
-                            // handle.
-                            if (KeyCode == 'W')
-                            {
-                                GlobalGameState.OffsetY -= 10;
-                                GlobalGameState.ToneHz += 10;
-                                SoundOutput.WavePeriod = SoundOutput.SamplesPerSec / GlobalGameState.ToneHz;
-                            }
-                            else if (KeyCode == 'S')
-                            {
-                                GlobalGameState.OffsetY += 10;
-                                GlobalGameState.ToneHz -= 10;
-                                SoundOutput.WavePeriod = SoundOutput.SamplesPerSec / GlobalGameState.ToneHz;
-                            }
-                            else if (KeyCode == 'A')
-                            {
-                                GlobalGameState.OffsetX -= 10;
-                            }
-                            else if (KeyCode == 'D')
-                            {
-                                GlobalGameState.OffsetX += 10;
-                            }
-                        } break;
-                        default:
-                        {
-                            TranslateMessage(&Message);
-                            DispatchMessageA(&Message);
-                        } break;
-                    }
+                    GlobalGameState.OffsetY -= 10;
+                    GlobalGameState.ToneHz += 10;
+                    SoundOutput.WavePeriod = SoundOutput.SamplesPerSec / GlobalGameState.ToneHz;
                 }
-
+                if (Input.Down.IsDown)
+                {
+                    GlobalGameState.OffsetY += 10;
+                    GlobalGameState.ToneHz -= 10;
+                    SoundOutput.WavePeriod = SoundOutput.SamplesPerSec / GlobalGameState.ToneHz;
+                }
+                if (Input.Left.IsDown)
+                {
+                    GlobalGameState.OffsetX -= 10;
+                }
+                if (Input.Right.IsDown)
+                {
+                    GlobalGameState.OffsetX += 10;
+                }
 
                 DWORD PlayCursor = 0;
                 DWORD WriteCursor = 0;
