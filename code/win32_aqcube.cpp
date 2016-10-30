@@ -18,6 +18,8 @@ typedef uint16_t uint16;
 typedef uint32_t uint32;
 typedef uint64_t uint64;
 
+#include "aqcube.cpp"
+
 struct win32_back_buffer
 {
     BITMAPINFO Info;
@@ -41,18 +43,11 @@ struct win32_sound_output
     int16 ToneVolume;
 };
 
-struct game_state
-{
-    int OffsetX;
-    int OffsetY;
-
-    int ToneHz;
-};
-
+game_state GlobalGameState;
 static bool GlobalRunning = true;
+
 static win32_back_buffer GlobalBackBuffer;
 static LPDIRECTSOUNDBUFFER GlobalSecondaryBuffer;
-game_state GlobalGameState;
 static LARGE_INTEGER GlobalPerfFrequencyCount;
 
 static void Win32ResizeBackBuffer(win32_back_buffer *Buffer, int Width, int Height)
@@ -222,21 +217,6 @@ inline static float Win32GetElapsedSeconds(LARGE_INTEGER Start, LARGE_INTEGER En
     float Result = ((float)(End.QuadPart - Start.QuadPart)) / 
                     (float)GlobalPerfFrequencyCount.QuadPart;
     return Result;
-}
-
-static void Update(win32_back_buffer *BackBuffer, game_state GameState)
-{
-    int32 *Pixel = (int32 *)BackBuffer->Memory;        
-    for (int YIndex = 0; YIndex < BackBuffer->Height; ++YIndex)
-    {
-        for (int XIndex = 0; XIndex < BackBuffer->Width; ++XIndex)
-        {
-            uint8 b = GameState.OffsetX + XIndex;
-            uint8 g = GameState.OffsetY + YIndex;
-            uint8 r = GameState.OffsetX + XIndex + GameState.OffsetY + YIndex;
-            *Pixel++ = (b << 0 | g << 8 | r << 16);
-        }
-    }
 }
 
 static LRESULT CALLBACK Win32MainCallWindowCallback(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam)
@@ -452,7 +432,14 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                     Win32WriteToSoundBuffer(&SoundOutput, ByteToLock, BytesToWrite);
                 }
 
-                Update(&GlobalBackBuffer, GlobalGameState);
+                game_back_buffer BackBuffer = {};
+                BackBuffer.Memory = GlobalBackBuffer.Memory;
+                BackBuffer.Width = GlobalBackBuffer.Width;
+                BackBuffer.Height = GlobalBackBuffer.Height;
+                BackBuffer.Pitch = GlobalBackBuffer.Pitch;
+                BackBuffer.BytesPerPixel = GlobalBackBuffer.BytesPerPixel;
+
+                UpdateGameAndRender(&BackBuffer, &GlobalGameState);
                 
                 LARGE_INTEGER FrameCount = Win32GetClock();
                 float ElapsedTime = Win32GetElapsedSeconds(LastFrameCount, FrameCount);
