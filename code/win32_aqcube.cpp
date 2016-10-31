@@ -2,7 +2,6 @@
 #include <dsound.h>
 
 #include <cassert>
-#include <cmath>
 #include <cstdint>
 #include <cstdio>
 
@@ -39,7 +38,6 @@ struct win32_sound_output
     uint32 RunningSamples;
     int LatencySampleCount;
     int WavePeriod;
-    float tSine;
     int16 ToneVolume;
 };
 
@@ -161,7 +159,7 @@ static void InitSound(HWND Window, DWORD SamplesPerSec, DWORD BufferSize)
     }
 }
 
-static void Win32WriteToSoundBuffer(win32_sound_output *SoundOutput, DWORD ByteToLock, DWORD BytesToWrite)
+static void Win32WriteToSoundBuffer(sound_buffer *SoundBuffer, win32_sound_output *SoundOutput, DWORD ByteToLock, DWORD BytesToWrite)
 {
     void *AudioPointer1 = 0;
     DWORD AudioBytes1 = 0;
@@ -174,31 +172,25 @@ static void Win32WriteToSoundBuffer(win32_sound_output *SoundOutput, DWORD ByteT
                 &AudioPointer2, &AudioBytes2, 
                 0) == DS_OK)
     {
+        int16 *Samples = SoundBuffer->Samples;
+
         int16 *Sample = (int16 *)AudioPointer1;
         int SamplesToWrite1 = AudioBytes1 / SoundOutput->BytesPerSample;
         for (int SampleIndex = 0; SampleIndex < SamplesToWrite1; ++SampleIndex)
         {
-            float SineValue = sinf(SoundOutput->tSine);
-            uint16 ToneValue = (uint16)(SoundOutput->ToneVolume*SineValue);
-
-            *Sample++ = ToneValue; // Left
-            *Sample++ = ToneValue; // Right
+            *Sample++ = *Samples++; // Left
+            *Sample++ = *Samples++; // Right
 
             ++SoundOutput->RunningSamples;
-            SoundOutput->tSine += 2*PI32 * 1.0f/(float)SoundOutput->WavePeriod;
         }
         Sample = (int16 *)AudioPointer2;
         int SamplesToWrite2 = AudioBytes2 / SoundOutput->BytesPerSample;
         for (int SampleIndex = 0; SampleIndex < SamplesToWrite2; ++SampleIndex)
         {
-            float SineValue = sinf(SoundOutput->tSine);
-            uint16 ToneValue = (uint16)(SoundOutput->ToneVolume*SineValue);
-
-            *Sample++ = ToneValue; // Left
-            *Sample++ = ToneValue; // Right
+            *Sample++ = *Samples++; // Left
+            *Sample++ = *Samples++; // Right
 
             ++SoundOutput->RunningSamples;
-            SoundOutput->tSine += 2*PI32 * 1.0f/(float)SoundOutput->WavePeriod;
         }
 
         GlobalSecondaryBuffer->Unlock(AudioPointer1, AudioBytes1, AudioPointer2, AudioBytes2);
@@ -259,6 +251,7 @@ static LRESULT CALLBACK Win32MainCallWindowCallback(HWND Window, UINT Message, W
     return Result;
 }
 
+// TODO(joe): This should not be specific to the platform.
 struct button_state
 {
     bool IsDown;
@@ -411,11 +404,15 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
 
                 DWORD PlayCursor = 0;
                 DWORD WriteCursor = 0;
+                DWORD ByteToLock = 0;
+                DWORD BytesToWrite = 0;
+                bool OutputSound = false;
                 if (GlobalSecondaryBuffer && GlobalSecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor) == DS_OK)
                 {
-                    DWORD ByteToLock = (SoundOutput.RunningSamples * SoundOutput.BytesPerSample) % SoundOutput.BufferSize;
+                    OutputSound = true;
+
+                    ByteToLock = (SoundOutput.RunningSamples * SoundOutput.BytesPerSample) % SoundOutput.BufferSize;
                     DWORD TargetCursor = (PlayCursor + (SoundOutput.LatencySampleCount * SoundOutput.BytesPerSample)) % SoundOutput.BufferSize;
-                    DWORD BytesToWrite = 0;
                     if (ByteToLock > TargetCursor)
                     {
                         BytesToWrite = (SoundOutput.BufferSize - ByteToLock) + TargetCursor;
@@ -429,7 +426,6 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                     snprintf(SoundCursorString, 255, "Play Cursor: %i RunningSamples: %i ByteToLock: %i BytesToWrite: %i\n", PlayCursor, SoundOutput.RunningSamples, ByteToLock, BytesToWrite);
                     OutputDebugStringA(SoundCursorString);
 #endif
-                    Win32WriteToSoundBuffer(&SoundOutput, ByteToLock, BytesToWrite);
                 }
 
                 game_back_buffer BackBuffer = {};
@@ -440,7 +436,18 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                 BackBuffer.BytesPerPixel = GlobalBackBuffer.BytesPerPixel;
 
                 UpdateGameAndRender(&BackBuffer, &GlobalGameState);
-                
+
+                if (OutputSound)
+                {
+                    sound_buffer SoundBuffer = {};
+                    SoundBuffer.Samples = (int16 *)VirtualAlloc(0, SoundOutput.BufferSize, 
+                                                                MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+                    SoundBuffer.SampleCount = BytesToWrite / SoundOutput.BytesPerSample;
+                    SoundBuffer.ToneVolume = SoundOutput.ToneVolume; 
+                    SoundBuffer.WavePeriod = SoundOutput.WavePeriod;
+                    GetSoundSamples(&SoundBuffer);
+                    Win32WriteToSoundBuffer(&SoundBuffer, &SoundOutput, ByteToLock, BytesToWrite);
+                }
 #if 0
                 LARGE_INTEGER FrameCount = Win32GetClock();
                 float ElapsedTime = Win32GetElapsedSeconds(LastFrameCount, FrameCount);

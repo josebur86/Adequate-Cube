@@ -11,6 +11,7 @@ struct game_state
 
     int ToneHz;
 };
+
 struct game_back_buffer
 {
     void *Memory;
@@ -21,3 +22,11 @@ struct game_back_buffer
 };
 void UpdateGameAndRender(game_back_buffer *BackBuffer, game_state *GameState);
 
+struct sound_buffer
+{
+    int16 *Samples;
+    int SampleCount;
+    int16 ToneVolume; 
+    int WavePeriod;
+};
+void GetSoundSamples(sound_buffer *SoundBuffer);
