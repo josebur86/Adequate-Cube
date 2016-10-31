@@ -71,7 +71,7 @@ static void Win32ResizeBackBuffer(win32_back_buffer *Buffer, int Width, int Heig
     Buffer->Info.bmiHeader.biHeight = -Buffer->Height;
     Buffer->Info.bmiHeader.biPlanes = 1;
     Buffer->Info.bmiHeader.biBitCount = 32;
-    Buffer->Info.bmiHeader.biCompression = BI_RGB; // Uncompressed: The value for blue is in the least significant 8 bits, followed by 8 bits each for green and red. 
+    Buffer->Info.bmiHeader.biCompression = BI_RGB; // Uncompressed: The value for blue is in the least significant 8 bits, followed by 8 bits each for green and red.
                                                    // BB GG RR XX
                                                    //
     Buffer->Pitch = Buffer->Width * Buffer->BytesPerPixel;
@@ -87,7 +87,7 @@ static void Win32PaintBackBuffer(HDC DeviceContext, win32_back_buffer *BackBuffe
     StretchDIBits(DeviceContext,
                   OffsetX, OffsetY, BackBuffer->Width, BackBuffer->Height, // Destination
                   0, 0, BackBuffer->Width, BackBuffer->Height, // Source
-                  BackBuffer->Memory, 
+                  BackBuffer->Memory,
                   &BackBuffer->Info,
                   DIB_RGB_COLORS,
                   SRCCOPY);
@@ -102,7 +102,7 @@ static void InitSound(HWND Window, DWORD SamplesPerSec, DWORD BufferSize)
 
     // Create the primary buffer
     // Note(joe): This call can fail if there isn't an audio device at startup.
-    LPDIRECTSOUND DirectSound; 
+    LPDIRECTSOUND DirectSound;
     if (DirectSoundCreate(NULL, &DirectSound, NULL) == DS_OK)
     {
         if (DirectSound->SetCooperativeLevel(Window, DSSCL_PRIORITY) == DS_OK)
@@ -167,9 +167,9 @@ static void Win32WriteToSoundBuffer(sound_buffer *SoundBuffer, win32_sound_outpu
     DWORD AudioBytes2 = 0;
     assert((AudioBytes1 / SoundOutput->BytesPerSample) == 0);
     assert((AudioBytes2 / SoundOutput->BytesPerSample) == 0);
-    if (GlobalSecondaryBuffer->Lock(ByteToLock, BytesToWrite, 
-                &AudioPointer1, &AudioBytes1, 
-                &AudioPointer2, &AudioBytes2, 
+    if (GlobalSecondaryBuffer->Lock(ByteToLock, BytesToWrite,
+                &AudioPointer1, &AudioBytes1,
+                &AudioPointer2, &AudioBytes2,
                 0) == DS_OK)
     {
         int16 *Samples = SoundBuffer->Samples;
@@ -206,7 +206,7 @@ inline static LARGE_INTEGER Win32GetClock()
 
 inline static float Win32GetElapsedSeconds(LARGE_INTEGER Start, LARGE_INTEGER End)
 {
-    float Result = ((float)(End.QuadPart - Start.QuadPart)) / 
+    float Result = ((float)(End.QuadPart - Start.QuadPart)) /
                     (float)GlobalPerfFrequencyCount.QuadPart;
     return Result;
 }
@@ -220,7 +220,7 @@ static LRESULT CALLBACK Win32MainCallWindowCallback(HWND Window, UINT Message, W
         case WM_CLOSE:
         case WM_DESTROY:
         {
-            GlobalRunning = false; 
+            GlobalRunning = false;
         } break;
         case WM_PAINT:
         {
@@ -228,7 +228,7 @@ static LRESULT CALLBACK Win32MainCallWindowCallback(HWND Window, UINT Message, W
 
             PAINTSTRUCT Paint;
             HDC DeviceContext = BeginPaint(Window, &Paint);
-    
+
             // Clear the entire client window to black.
             RECT ClientRect;
             GetClientRect(Window, &ClientRect);
@@ -369,7 +369,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
             int MonitorHz = 60;
             int GameUpdateHz = 30;
             float TargetFrameSeconds = 1.0f / (float)GameUpdateHz;
-            
+
             game_controller_input Input = {};
 
             LARGE_INTEGER LastFrameCount = Win32GetClock();
@@ -440,10 +440,12 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                 if (OutputSound)
                 {
                     sound_buffer SoundBuffer = {};
-                    SoundBuffer.Samples = (int16 *)VirtualAlloc(0, SoundOutput.BufferSize, 
+                    // TODO(joe): We should only need to allocate this block of memory once instead
+                    // of on every frame.
+                    SoundBuffer.Samples = (int16 *)VirtualAlloc(0, SoundOutput.BufferSize,
                                                                 MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
                     SoundBuffer.SampleCount = BytesToWrite / SoundOutput.BytesPerSample;
-                    SoundBuffer.ToneVolume = SoundOutput.ToneVolume; 
+                    SoundBuffer.ToneVolume = SoundOutput.ToneVolume;
                     SoundBuffer.WavePeriod = SoundOutput.WavePeriod;
                     GetSoundSamples(&SoundBuffer);
                     Win32WriteToSoundBuffer(&SoundBuffer, &SoundOutput, ByteToLock, BytesToWrite);
@@ -461,7 +463,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                             Sleep(TimeToSleep);
                         }
                     }
-                    
+
                     ElapsedTime = Win32GetElapsedSeconds(LastFrameCount, Win32GetClock());
                     while (ElapsedTime < TargetFrameSeconds)
                     {

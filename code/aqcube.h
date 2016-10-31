@@ -26,7 +26,7 @@ struct sound_buffer
 {
     int16 *Samples;
     int SampleCount;
-    int16 ToneVolume; 
+    int16 ToneVolume;
     int WavePeriod;
 };
 void GetSoundSamples(sound_buffer *SoundBuffer);

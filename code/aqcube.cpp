@@ -4,7 +4,7 @@
 
 static void Render(game_back_buffer *BackBuffer, game_state *GameState)
 {
-    int32 *Pixel = (int32 *)BackBuffer->Memory;        
+    int32 *Pixel = (int32 *)BackBuffer->Memory;
     for (int YIndex = 0; YIndex < BackBuffer->Height; ++YIndex)
     {
         for (int XIndex = 0; XIndex < BackBuffer->Width; ++XIndex)
