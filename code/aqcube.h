@@ -12,6 +12,17 @@ struct game_state
     int ToneHz;
 };
 
+struct button_state
+{
+    bool IsDown;
+};
+struct game_controller_input
+{
+    button_state Up;
+    button_state Down;
+    button_state Left;
+    button_state Right;
+};
 struct game_back_buffer
 {
     void *Memory;
@@ -20,7 +31,7 @@ struct game_back_buffer
     int Pitch;
     int BytesPerPixel;
 };
-void UpdateGameAndRender(game_back_buffer *BackBuffer, game_state *GameState);
+void UpdateGameAndRender(game_back_buffer *BackBuffer, game_controller_input *Input, game_state *GameState);
 
 struct sound_buffer
 {

@@ -17,8 +17,27 @@ static void Render(game_back_buffer *BackBuffer, game_state *GameState)
     }
 }
 
-void UpdateGameAndRender(game_back_buffer *BackBuffer, game_state *GameState)
+void UpdateGameAndRender(game_back_buffer *BackBuffer, game_controller_input *Input, game_state *GameState)
 {
+    if (Input->Up.IsDown)
+    {
+        GameState->OffsetY -= 10;
+        GameState->ToneHz += 10;
+    }
+    if (Input->Down.IsDown)
+    {
+        GameState->OffsetY += 10;
+        GameState->ToneHz -= 10;
+    }
+    if (Input->Left.IsDown)
+    {
+        GameState->OffsetX -= 10;
+    }
+    if (Input->Right.IsDown)
+    {
+        GameState->OffsetX += 10;
+    }
+
     Render(BackBuffer, GameState);
 }
 

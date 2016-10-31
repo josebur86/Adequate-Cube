@@ -37,7 +37,6 @@ struct win32_sound_output
 
     uint32 RunningSamples;
     int LatencySampleCount;
-    int WavePeriod;
     int16 ToneVolume;
 };
 
@@ -251,20 +250,6 @@ static LRESULT CALLBACK Win32MainCallWindowCallback(HWND Window, UINT Message, W
     return Result;
 }
 
-// TODO(joe): This should not be specific to the platform.
-struct button_state
-{
-    bool IsDown;
-};
-
-struct game_controller_input
-{
-    button_state Up;
-    button_state Down;
-    button_state Left;
-    button_state Right;
-};
-
 static void Win32ProcessButtonState(button_state *Button, bool IsDown)
 {
     assert(Button->IsDown != IsDown);
@@ -360,7 +345,6 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
             SoundOutput.LatencySampleCount = SoundOutput.SamplesPerSec / 15;
 
             SoundOutput.ToneVolume = 1600;
-            SoundOutput.WavePeriod = SoundOutput.SamplesPerSec / GlobalGameState.ToneHz; // samples
             InitSound(Window, SoundOutput.SamplesPerSec, SoundOutput.BufferSize);
 
             UINT TimerResolutionMS = 1;
@@ -377,30 +361,6 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
             while(GlobalRunning)
             {
                 Win32ProcessPendingMessages(&Input);
-
-                // TODO(joe): Input handling is something that should happen
-                // outside of the platform layer. Move this to the game
-                // layer when it is available.
-                if (Input.Up.IsDown)
-                {
-                    GlobalGameState.OffsetY -= 10;
-                    GlobalGameState.ToneHz += 10;
-                    SoundOutput.WavePeriod = SoundOutput.SamplesPerSec / GlobalGameState.ToneHz;
-                }
-                if (Input.Down.IsDown)
-                {
-                    GlobalGameState.OffsetY += 10;
-                    GlobalGameState.ToneHz -= 10;
-                    SoundOutput.WavePeriod = SoundOutput.SamplesPerSec / GlobalGameState.ToneHz;
-                }
-                if (Input.Left.IsDown)
-                {
-                    GlobalGameState.OffsetX -= 10;
-                }
-                if (Input.Right.IsDown)
-                {
-                    GlobalGameState.OffsetX += 10;
-                }
 
                 DWORD PlayCursor = 0;
                 DWORD WriteCursor = 0;
@@ -435,7 +395,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                 BackBuffer.Pitch = GlobalBackBuffer.Pitch;
                 BackBuffer.BytesPerPixel = GlobalBackBuffer.BytesPerPixel;
 
-                UpdateGameAndRender(&BackBuffer, &GlobalGameState);
+                UpdateGameAndRender(&BackBuffer, &Input, &GlobalGameState);
 
                 if (OutputSound)
                 {
@@ -446,7 +406,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                                                                 MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
                     SoundBuffer.SampleCount = BytesToWrite / SoundOutput.BytesPerSample;
                     SoundBuffer.ToneVolume = SoundOutput.ToneVolume;
-                    SoundBuffer.WavePeriod = SoundOutput.WavePeriod;
+                    SoundBuffer.WavePeriod = SoundOutput.SamplesPerSec / GlobalGameState.ToneHz;
                     GetSoundSamples(&SoundBuffer);
                     Win32WriteToSoundBuffer(&SoundBuffer, &SoundOutput, ByteToLock, BytesToWrite);
                 }
