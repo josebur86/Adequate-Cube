@@ -17,8 +17,17 @@ static void Render(game_back_buffer *BackBuffer, game_state *GameState)
     }
 }
 
-void UpdateGameAndRender(game_back_buffer *BackBuffer, game_controller_input *Input, game_state *GameState)
+void UpdateGameAndRender(game_memory *Memory, game_back_buffer *BackBuffer, game_sound_buffer *SoundBuffer, game_controller_input *Input)
 {
+    game_state *GameState= (game_state *)Memory->PermanentStorage;
+    if (!Memory->IsInitialized)
+    {
+        GameState->OffsetX = 0;
+        GameState->OffsetY = 0;
+        GameState->ToneHz = 256;
+
+        Memory->IsInitialized = true;
+    }
     if (Input->Up.IsDown)
     {
         GameState->OffsetY -= 10;
@@ -39,13 +48,16 @@ void UpdateGameAndRender(game_back_buffer *BackBuffer, game_controller_input *In
     }
 
     Render(BackBuffer, GameState);
+    GetSoundSamples(SoundBuffer, GameState);
 }
 
-void GetSoundSamples(sound_buffer *SoundBuffer)
+void GetSoundSamples(game_sound_buffer *SoundBuffer, game_state* GameState)
 {
     // TODO(joe): This is pretty hacky but the real game won't be generating sounds
     // using sine anyway. Remove this when we can actually play sound files.
     static float tSine = 0.0f;
+
+    float WavePeriod = (float)SoundBuffer->SamplesPerSec / GameState->ToneHz;
 
     int16 *Sample = SoundBuffer->Samples;
     for (int SampleIndex = 0; SampleIndex < SoundBuffer->SampleCount; ++SampleIndex)
@@ -56,6 +68,6 @@ void GetSoundSamples(sound_buffer *SoundBuffer)
         *Sample++ = ToneValue; // Left
         *Sample++ = ToneValue; // Right
 
-        tSine += 2*PI32 * 1.0f/(float)SoundBuffer->WavePeriod;
+        tSine += 2*PI32 * 1.0f/WavePeriod;
     }
 }

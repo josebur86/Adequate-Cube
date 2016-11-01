@@ -1,9 +1,23 @@
 #pragma once
 
+#define Kilobytes(Value) ((Value) * 1024)
+#define Megabytes(Value) ((Kilobytes(Value)) * 1024)
+#define Gigabytes(Value) ((Megabytes(Value)) * 1024)
+
 // TODO(joe): These are service to the game provided by the platform layer.
 // ex. Opening a file.
 
 // Note(joe): These are service to the platform layer provided by the game.
+struct game_memory
+{
+    uint64 PermanentStorageSize;
+    void *PermanentStorage; // This should always be cleared to zero.
+    uint64 TransientStorageSize;
+    void *TransientStorage; // This should always be cleared to zero.
+
+    bool IsInitialized;
+};
+
 struct game_state
 {
     int OffsetX;
@@ -31,13 +45,12 @@ struct game_back_buffer
     int Pitch;
     int BytesPerPixel;
 };
-void UpdateGameAndRender(game_back_buffer *BackBuffer, game_controller_input *Input, game_state *GameState);
-
-struct sound_buffer
+struct game_sound_buffer
 {
     int16 *Samples;
     int SampleCount;
     int16 ToneVolume;
-    int WavePeriod;
+    int16 SamplesPerSec;
 };
-void GetSoundSamples(sound_buffer *SoundBuffer);
+void UpdateGameAndRender(game_memory *Memory, game_back_buffer *BackBuffer, game_sound_buffer *SoundBuffer, game_controller_input *Input);
+void GetSoundSamples(game_sound_buffer *SoundBuffer, game_state* GameState);
