@@ -4,8 +4,10 @@
 #define Megabytes(Value) ((Kilobytes(Value)) * 1024)
 #define Gigabytes(Value) ((Megabytes(Value)) * 1024)
 
-// TODO(joe): These are service to the game provided by the platform layer.
-// ex. Opening a file.
+// Note(joe): These are service to the game provided by the platform layer.
+void *ReadFile(char *Filename);
+// TODO(joe): WriteFile
+void FreeMemory(void *Memory);
 
 // Note(joe): These are service to the platform layer provided by the game.
 struct game_memory

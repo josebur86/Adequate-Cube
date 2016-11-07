@@ -40,6 +40,48 @@ struct win32_sound_output
     int16 ToneVolume;
 };
 
+void *ReadFile(char *Filename)
+{
+    void *Result = 0;
+
+    HANDLE FileHandle = CreateFileA(Filename, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
+    if (FileHandle)
+    {
+        LARGE_INTEGER FileSize;
+        if(GetFileSizeEx(FileHandle, &FileSize))
+        {
+            DWORD FileSize32 = (DWORD)FileSize.QuadPart; // TODO(joe): Safe truncation?
+            Result = VirtualAlloc(0, FileSize32, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+            if (Result)
+            {
+                DWORD BytesRead = 0;
+                ReadFile(FileHandle, Result, FileSize32, &BytesRead, 0);
+                if (BytesRead == FileSize32)
+                {
+                    // Success
+                }
+                else
+                {
+                    FreeMemory(Result);
+                }
+            }
+        }
+
+        CloseHandle(FileHandle);
+    }
+
+    return Result;
+}
+
+void FreeMemory(void *Memory)
+{
+    if (Memory)
+    {
+        VirtualFree(Memory, 0, MEM_RELEASE);
+        Memory = 0;
+    }
+}
+
 static bool GlobalRunning = true;
 
 static win32_back_buffer GlobalBackBuffer;
