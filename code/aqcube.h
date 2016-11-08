@@ -5,9 +5,14 @@
 #define Gigabytes(Value) ((Megabytes(Value)) * 1024)
 
 // Note(joe): These are service to the game provided by the platform layer.
-void *ReadFile(char *Filename);
-// TODO(joe): WriteFile
-void FreeMemory(void *Memory);
+struct read_file_result
+{
+    void *Contents;
+    int SizeInBytes;
+};
+read_file_result DEBUGWin32ReadFile(char *Filename);
+bool DEBUGWin32WriteFile(char *Filename, void *Memory, uint64 FileSize);
+void Win32FreeMemory(void *Memory);
 
 // Note(joe): These are service to the platform layer provided by the game.
 struct game_memory

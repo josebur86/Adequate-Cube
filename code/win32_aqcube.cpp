@@ -40,9 +40,9 @@ struct win32_sound_output
     int16 ToneVolume;
 };
 
-void *ReadFile(char *Filename)
+read_file_result DEBUGWin32ReadFile(char *Filename)
 {
-    void *Result = 0;
+    read_file_result Result = {};
 
     HANDLE FileHandle = CreateFileA(Filename, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
     if (FileHandle)
@@ -51,18 +51,18 @@ void *ReadFile(char *Filename)
         if(GetFileSizeEx(FileHandle, &FileSize))
         {
             DWORD FileSize32 = (DWORD)FileSize.QuadPart; // TODO(joe): Safe truncation?
-            Result = VirtualAlloc(0, FileSize32, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-            if (Result)
+            Result.Contents = VirtualAlloc(0, FileSize32, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+            if (Result.Contents)
             {
                 DWORD BytesRead = 0;
-                ReadFile(FileHandle, Result, FileSize32, &BytesRead, 0);
+                ReadFile(FileHandle, Result.Contents, FileSize32, &BytesRead, 0);
                 if (BytesRead == FileSize32)
                 {
-                    // Success
+                    Result.SizeInBytes = FileSize32;
                 }
                 else
                 {
-                    FreeMemory(Result);
+                    Win32FreeMemory(Result.Contents);
                 }
             }
         }
@@ -73,7 +73,25 @@ void *ReadFile(char *Filename)
     return Result;
 }
 
-void FreeMemory(void *Memory)
+bool DEBUGWin32WriteFile(char *Filename, void *Memory, int FileSize)
+{
+    bool Result = false;
+    HANDLE FileHandle = CreateFileA(Filename, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
+    if (FileHandle)
+    {
+        DWORD BytesWritten = 0;
+        if (WriteFile(FileHandle, Memory, FileSize, &BytesWritten, 0) && BytesWritten == FileSize)
+        {
+            Result = true;
+        }
+
+        CloseHandle(FileHandle);
+    }
+
+    return Result;
+}
+
+void Win32FreeMemory(void *Memory)
 {
     if (Memory)
     {
@@ -496,6 +514,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                     // becomes NULL and we can no longer paint to the screen. WM_APPACTIVATE?
                     HDC DeviceContext = GetDC(Window);
                     Win32PaintBackBuffer(DeviceContext, &GlobalBackBuffer);
+                    ReleaseDC(Window, DeviceContext);
                 }
             }
         }
