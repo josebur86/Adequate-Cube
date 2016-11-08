@@ -73,7 +73,7 @@ read_file_result DEBUGWin32ReadFile(char *Filename)
     return Result;
 }
 
-bool DEBUGWin32WriteFile(char *Filename, void *Memory, int FileSize)
+bool DEBUGWin32WriteFile(char *Filename, void *Memory, uint32 FileSize)
 {
     bool Result = false;
     HANDLE FileHandle = CreateFileA(Filename, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
@@ -153,9 +153,9 @@ static void Win32PaintBackBuffer(HDC DeviceContext, win32_back_buffer *BackBuffe
 
 static void InitSound(HWND Window, DWORD SamplesPerSec, DWORD BufferSize)
 {
-    DWORD Channels = 2;
+    WORD Channels = 2;
     WORD BitsPerSample = 16;
-    DWORD BlockAlign = Channels * (BitsPerSample / 8);
+    WORD BlockAlign = Channels * (BitsPerSample / 8);
     DWORD AvgBytesPerSec = SamplesPerSec * BlockAlign;
 
     // Create the primary buffer
@@ -193,7 +193,7 @@ static void InitSound(HWND Window, DWORD SamplesPerSec, DWORD BufferSize)
                 HRESULT SecondaryBufferResult = DirectSound->CreateSoundBuffer(&SecondaryBufferDescription, &GlobalSecondaryBuffer, 0);
                 if (SecondaryBufferResult == DS_OK)
                 {
-                    HRESULT PlayResult = GlobalSecondaryBuffer->Play(0, 0, DSBPLAY_LOOPING);
+                    GlobalSecondaryBuffer->Play(0, 0, DSBPLAY_LOOPING);
                     OutputDebugStringA("Created the secondary buffer.\n");
                 }
                 else
@@ -410,13 +410,15 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                 SoundOutput.ToneVolume = 1600;
                 InitSound(Window, SoundOutput.SamplesPerSec, SoundOutput.BufferSize);
 
+#if 0
                 UINT TimerResolutionMS = 1;
-                bool TimeIsGranular = timeBeginPeriod(TimerResolutionMS) == TIMERR_NOERROR;
 
                 int MonitorHz = 60;
                 int GameUpdateHz = 30;
                 float TargetFrameSeconds = 1.0f / (float)GameUpdateHz;
 
+                bool TimeIsGranular = timeBeginPeriod(TimerResolutionMS) == TIMERR_NOERROR;
+#endif
                 game_controller_input Input = {};
 
                 LARGE_INTEGER LastFrameCount = Win32GetClock();

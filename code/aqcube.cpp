@@ -9,9 +9,9 @@ static void Render(game_back_buffer *BackBuffer, game_state *GameState)
     {
         for (int XIndex = 0; XIndex < BackBuffer->Width; ++XIndex)
         {
-            uint8 b = GameState->OffsetX + XIndex;
-            uint8 g = GameState->OffsetY + YIndex;
-            uint8 r = GameState->OffsetX + XIndex + GameState->OffsetY + YIndex;
+            uint8 b = (uint8)(GameState->OffsetX + XIndex);
+            uint8 g = (uint8)(GameState->OffsetY + YIndex);
+            uint8 r = (uint8)(GameState->OffsetX + XIndex + GameState->OffsetY + YIndex);
             *Pixel++ = (b << 0 | g << 8 | r << 16);
         }
     }
