@@ -17,7 +17,7 @@ static void Render(game_back_buffer *BackBuffer, game_state *GameState)
     }
 }
 
-void UpdateGameAndRender(game_memory *Memory, game_back_buffer *BackBuffer, game_sound_buffer *SoundBuffer, game_controller_input *Input)
+extern "C" void UpdateGameAndRender(game_memory *Memory, game_back_buffer *BackBuffer, game_sound_buffer *SoundBuffer, game_controller_input *Input)
 {
     game_state *GameState= (game_state *)Memory->PermanentStorage;
     if (!Memory->IsInitialized)
@@ -48,11 +48,11 @@ void UpdateGameAndRender(game_memory *Memory, game_back_buffer *BackBuffer, game
     }
 
     Render(BackBuffer, GameState);
-    GetSoundSamples(SoundBuffer, GameState);
 }
 
-void GetSoundSamples(game_sound_buffer *SoundBuffer, game_state* GameState)
+extern "C" void GetSoundSamples(game_sound_buffer *SoundBuffer, game_memory *Memory)
 {
+    game_state *GameState= (game_state *)Memory->PermanentStorage;
     // TODO(joe): This is pretty hacky but the real game won't be generating sounds
     // using sine anyway. Remove this when we can actually play sound files.
     static float tSine = 0.0f;

@@ -73,5 +73,5 @@ struct game_sound_buffer
     int16 ToneVolume;
     int16 SamplesPerSec;
 };
-void UpdateGameAndRender(game_memory *Memory, game_back_buffer *BackBuffer, game_sound_buffer *SoundBuffer, game_controller_input *Input);
-void GetSoundSamples(game_sound_buffer *SoundBuffer, game_state* GameState);
+extern "C" void UpdateGameAndRender(game_memory *Memory, game_back_buffer *BackBuffer, game_sound_buffer *SoundBuffer, game_controller_input *Input);
+extern "C" void GetSoundSamples(game_sound_buffer *SoundBuffer, game_memory *Memory);

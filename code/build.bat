@@ -23,6 +23,7 @@ set LinkerFlags= /opt:ref user32.lib Gdi32.lib DSound.lib Winmm.lib
 if not exist ..\build mkdir ..\build
 pushd ..\build
 
+cl %CompilerFlags% /LD ..\code\aqcube.cpp /link %LinkerFlags% -export:UpdateGameAndRender -export:GetSoundSamples
 cl %CompilerFlags% ..\code\win32_aqcube.cpp /link %LinkerFlags%
 
 popd

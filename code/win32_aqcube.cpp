@@ -5,7 +5,7 @@
 #include <cstdio>
 
 #include "aqcube_platform.h"
-#include "aqcube.cpp"
+#include "aqcube.cpp" // TODO(joe): reconstruct the code so that this can be completely removed.
 
 struct win32_back_buffer
 {
@@ -350,7 +350,11 @@ static void Win32ProcessPendingMessages(game_controller_input *Input)
         }
     }
 }
+typedef void (*UpdateGameAndRenderFunc)(game_memory *Memory, game_back_buffer *BackBuffer, game_sound_buffer *SoundBuffer, game_controller_input *Input);
+typedef void (*GetSoundSamplesFunc)(game_sound_buffer *SoundBuffer, game_memory *Memory);
 
+UpdateGameAndRenderFunc GlobalUpdateGameAndRender;
+GetSoundSamplesFunc GlobalGetSoundSamples;
 
 int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLine, int ShowCode)
 {
@@ -385,126 +389,138 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
 
             if(Memory.PermanentStorage && Memory.TransientStorage)
             {
-                QueryPerformanceFrequency(&GlobalPerfFrequencyCount);
+                HMODULE GameHandle = LoadLibraryA("aqcube.dll");
+                if (GameHandle)
+                {
+                    GlobalUpdateGameAndRender = (UpdateGameAndRenderFunc)GetProcAddress(GameHandle, "UpdateGameAndRender");
+                    GlobalGetSoundSamples = (GetSoundSamplesFunc)GetProcAddress(GameHandle, "GetSoundSamples");
 
-                Win32ResizeBackBuffer(&GlobalBackBuffer, 960, 540);
+                    QueryPerformanceFrequency(&GlobalPerfFrequencyCount);
 
-                win32_sound_output SoundOutput = {};
-                SoundOutput.SamplesPerSec = 44100;
-                SoundOutput.BytesPerSample = 2*sizeof(int16);
-                SoundOutput.BufferSize = SoundOutput.SamplesPerSec * SoundOutput.BytesPerSample;
-                SoundOutput.LatencySampleCount = SoundOutput.SamplesPerSec / 15;
+                    Win32ResizeBackBuffer(&GlobalBackBuffer, 960, 540);
 
-                SoundOutput.ToneVolume = 1600;
-                InitSound(Window, SoundOutput.SamplesPerSec, SoundOutput.BufferSize);
+                    win32_sound_output SoundOutput = {};
+                    SoundOutput.SamplesPerSec = 44100;
+                    SoundOutput.BytesPerSample = 2*sizeof(int16);
+                    SoundOutput.BufferSize = SoundOutput.SamplesPerSec * SoundOutput.BytesPerSample;
+                    SoundOutput.LatencySampleCount = SoundOutput.SamplesPerSec / 15;
+
+                    SoundOutput.ToneVolume = 1600;
+                    InitSound(Window, SoundOutput.SamplesPerSec, SoundOutput.BufferSize);
 
 #if 0
-                UINT TimerResolutionMS = 1;
+                    UINT TimerResolutionMS = 1;
 
-                int MonitorHz = 60;
-                int GameUpdateHz = 30;
-                float TargetFrameSeconds = 1.0f / (float)GameUpdateHz;
+                    int MonitorHz = 60;
+                    int GameUpdateHz = 30;
+                    float TargetFrameSeconds = 1.0f / (float)GameUpdateHz;
 
-                bool TimeIsGranular = timeBeginPeriod(TimerResolutionMS) == TIMERR_NOERROR;
+                    bool TimeIsGranular = timeBeginPeriod(TimerResolutionMS) == TIMERR_NOERROR;
 #endif
-                game_controller_input Input = {};
+                    game_controller_input Input = {};
 
-                LARGE_INTEGER LastFrameCount = Win32GetClock();
-                GlobalRunning = true;
-                while(GlobalRunning)
-                {
-                    Win32ProcessPendingMessages(&Input);
-
-                    DWORD PlayCursor = 0;
-                    DWORD WriteCursor = 0;
-                    DWORD ByteToLock = 0;
-                    DWORD BytesToWrite = 0;
-                    bool OutputSound = false;
-                    if (GlobalSecondaryBuffer && GlobalSecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor) == DS_OK)
+                    LARGE_INTEGER LastFrameCount = Win32GetClock();
+                    GlobalRunning = true;
+                    while(GlobalRunning)
                     {
-                        OutputSound = true;
+                        Win32ProcessPendingMessages(&Input);
 
-                        ByteToLock = (SoundOutput.RunningSamples * SoundOutput.BytesPerSample) % SoundOutput.BufferSize;
-                        DWORD TargetCursor = (PlayCursor + (SoundOutput.LatencySampleCount * SoundOutput.BytesPerSample)) % SoundOutput.BufferSize;
-                        if (ByteToLock > TargetCursor)
+                        DWORD PlayCursor = 0;
+                        DWORD WriteCursor = 0;
+                        DWORD ByteToLock = 0;
+                        DWORD BytesToWrite = 0;
+                        bool OutputSound = false;
+                        if (GlobalSecondaryBuffer && GlobalSecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor) == DS_OK)
                         {
-                            BytesToWrite = (SoundOutput.BufferSize - ByteToLock) + TargetCursor;
+                            OutputSound = true;
+
+                            ByteToLock = (SoundOutput.RunningSamples * SoundOutput.BytesPerSample) % SoundOutput.BufferSize;
+                            DWORD TargetCursor = (PlayCursor + (SoundOutput.LatencySampleCount * SoundOutput.BytesPerSample)) % SoundOutput.BufferSize;
+                            if (ByteToLock > TargetCursor)
+                            {
+                                BytesToWrite = (SoundOutput.BufferSize - ByteToLock) + TargetCursor;
+                            }
+                            else
+                            {
+                                BytesToWrite = TargetCursor - ByteToLock;
+                            }
+#if 0
+                            char SoundCursorString[255];
+                            snprintf(SoundCursorString, 255, "Play Cursor: %i RunningSamples: %i ByteToLock: %i BytesToWrite: %i\n", PlayCursor, SoundOutput.RunningSamples, ByteToLock, BytesToWrite);
+                            OutputDebugStringA(SoundCursorString);
+#endif
+                        }
+
+                        game_back_buffer BackBuffer = {};
+                        BackBuffer.Memory = GlobalBackBuffer.Memory;
+                        BackBuffer.Width = GlobalBackBuffer.Width;
+                        BackBuffer.Height = GlobalBackBuffer.Height;
+                        BackBuffer.Pitch = GlobalBackBuffer.Pitch;
+                        BackBuffer.BytesPerPixel = GlobalBackBuffer.BytesPerPixel;
+
+                        game_sound_buffer SoundBuffer = {};
+                        // TODO(joe): We should only need to allocate this block of memory once instead
+                        // of on every frame.
+                        SoundBuffer.Samples = (int16 *)VirtualAlloc(0, SoundOutput.BufferSize,
+                                MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+                        SoundBuffer.SampleCount = BytesToWrite / SoundOutput.BytesPerSample;
+                        SoundBuffer.ToneVolume = SoundOutput.ToneVolume;
+                        SoundBuffer.SamplesPerSec = SoundOutput.SamplesPerSec;
+                        GlobalUpdateGameAndRender(&Memory, &BackBuffer, &SoundBuffer, &Input);
+                        GlobalGetSoundSamples(&SoundBuffer, &Memory);
+
+                        if (OutputSound)
+                        {
+                            Win32WriteToSoundBuffer(&SoundBuffer, &SoundOutput, ByteToLock, BytesToWrite);
+                        }
+                        VirtualFree(SoundBuffer.Samples, 0, MEM_RELEASE);
+#if 0
+                        LARGE_INTEGER FrameCount = Win32GetClock();
+                        float ElapsedTime = Win32GetElapsedSeconds(LastFrameCount, FrameCount);
+                        if (ElapsedTime < TargetFrameSeconds)
+                        {
+                            DWORD TimeToSleep = (DWORD)(1000.0f * (TargetFrameSeconds - ElapsedTime));
+                            if (TimeIsGranular)
+                            {
+                                if (TimeToSleep > 0)
+                                {
+                                    Sleep(TimeToSleep);
+                                }
+                            }
+
+                            ElapsedTime = Win32GetElapsedSeconds(LastFrameCount, Win32GetClock());
+                            while (ElapsedTime < TargetFrameSeconds)
+                            {
+                                ElapsedTime = Win32GetElapsedSeconds(LastFrameCount, Win32GetClock());
+                            }
                         }
                         else
                         {
-                            BytesToWrite = TargetCursor - ByteToLock;
+                            // TODO(joe): Log that we missed a frame.
                         }
-#if 0
-                        char SoundCursorString[255];
-                        snprintf(SoundCursorString, 255, "Play Cursor: %i RunningSamples: %i ByteToLock: %i BytesToWrite: %i\n", PlayCursor, SoundOutput.RunningSamples, ByteToLock, BytesToWrite);
-                        OutputDebugStringA(SoundCursorString);
-#endif
-                    }
-
-                    game_back_buffer BackBuffer = {};
-                    BackBuffer.Memory = GlobalBackBuffer.Memory;
-                    BackBuffer.Width = GlobalBackBuffer.Width;
-                    BackBuffer.Height = GlobalBackBuffer.Height;
-                    BackBuffer.Pitch = GlobalBackBuffer.Pitch;
-                    BackBuffer.BytesPerPixel = GlobalBackBuffer.BytesPerPixel;
-
-                    game_sound_buffer SoundBuffer = {};
-                    // TODO(joe): We should only need to allocate this block of memory once instead
-                    // of on every frame.
-                    SoundBuffer.Samples = (int16 *)VirtualAlloc(0, SoundOutput.BufferSize,
-                                                                MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-                    SoundBuffer.SampleCount = BytesToWrite / SoundOutput.BytesPerSample;
-                    SoundBuffer.ToneVolume = SoundOutput.ToneVolume;
-                    SoundBuffer.SamplesPerSec = SoundOutput.SamplesPerSec;
-                    UpdateGameAndRender(&Memory, &BackBuffer, &SoundBuffer, &Input);
-
-                    if (OutputSound)
-                    {
-                        Win32WriteToSoundBuffer(&SoundBuffer, &SoundOutput, ByteToLock, BytesToWrite);
-                    }
-                    VirtualFree(SoundBuffer.Samples, 0, MEM_RELEASE);
-#if 0
-                    LARGE_INTEGER FrameCount = Win32GetClock();
-                    float ElapsedTime = Win32GetElapsedSeconds(LastFrameCount, FrameCount);
-                    if (ElapsedTime < TargetFrameSeconds)
-                    {
-                        DWORD TimeToSleep = (DWORD)(1000.0f * (TargetFrameSeconds - ElapsedTime));
-                        if (TimeIsGranular)
-                        {
-                            if (TimeToSleep > 0)
-                            {
-                                Sleep(TimeToSleep);
-                            }
-                        }
-
-                        ElapsedTime = Win32GetElapsedSeconds(LastFrameCount, Win32GetClock());
-                        while (ElapsedTime < TargetFrameSeconds)
-                        {
-                            ElapsedTime = Win32GetElapsedSeconds(LastFrameCount, Win32GetClock());
-                        }
-                    }
-                    else
-                    {
-                        // TODO(joe): Log that we missed a frame.
-                    }
 #endif
 
-                    LARGE_INTEGER EndCount = Win32GetClock();
+                        LARGE_INTEGER EndCount = Win32GetClock();
 
 #if 1
-                    char FrameTimeString[255];
-                    float MSPerFrame = 1000.0f * Win32GetElapsedSeconds(LastFrameCount, EndCount);
-                    float FPS = 1000.0f / MSPerFrame;
-                    snprintf(FrameTimeString, 255, "ms/f: %.2f f/s: %.2f \n", MSPerFrame, FPS);
-                    OutputDebugStringA(FrameTimeString);
+                        char FrameTimeString[255];
+                        float MSPerFrame = 1000.0f * Win32GetElapsedSeconds(LastFrameCount, EndCount);
+                        float FPS = 1000.0f / MSPerFrame;
+                        snprintf(FrameTimeString, 255, "ms/f: %.2f f/s: %.2f \n", MSPerFrame, FPS);
+                        OutputDebugStringA(FrameTimeString);
 #endif
-                    LastFrameCount = EndCount;
+                        LastFrameCount = EndCount;
 
-                    // TODO(joe): Weird issue: After the app is out of focus for a while the DeviceContext
-                    // becomes NULL and we can no longer paint to the screen. WM_APPACTIVATE?
-                    HDC DeviceContext = GetDC(Window);
-                    Win32PaintBackBuffer(DeviceContext, &GlobalBackBuffer);
-                    ReleaseDC(Window, DeviceContext);
+                        // TODO(joe): Weird issue: After the app is out of focus for a while the DeviceContext
+                        // becomes NULL and we can no longer paint to the screen. WM_APPACTIVATE?
+                        HDC DeviceContext = GetDC(Window);
+                        Win32PaintBackBuffer(DeviceContext, &GlobalBackBuffer);
+                        ReleaseDC(Window, DeviceContext);
+                    }
+                }
+                else
+                {
+                    // TODO(joe): Log that we couldn't load the game handle.
                 }
             }
         }
