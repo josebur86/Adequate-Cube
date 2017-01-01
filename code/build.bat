@@ -15,10 +15,10 @@ REM /W4: Level 4 warnings
 REM /wd####: Disable warning number ####
 REM /FC: Display full path to source
 REM
-set CompilerFlags= /Od /Zi /MT /nologo /Gm- /GR- /EHa- /Oi /WX /W4 /wd4100 /FC
+set CompilerFlags= /Od /Zi /MTd /nologo /Gm- /GR- /EHa- /Zo /Oi /WX /W4 /wd4100 /FC /Z7
 
 REM Linkder Flags
-set LinkerFlags= /opt:ref user32.lib Gdi32.lib DSound.lib Winmm.lib
+set LinkerFlags= /incremental:no /opt:ref user32.lib Gdi32.lib DSound.lib Winmm.lib
 
 if not exist ..\build mkdir ..\build
 pushd ..\build

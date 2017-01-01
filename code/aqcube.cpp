@@ -17,7 +17,7 @@ static void Render(game_back_buffer *BackBuffer, game_state *GameState)
     }
 }
 
-extern "C" void UpdateGameAndRender(game_memory *Memory, game_back_buffer *BackBuffer, game_sound_buffer *SoundBuffer, game_controller_input *Input)
+extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
 {
     game_state *GameState= (game_state *)Memory->PermanentStorage;
     if (!Memory->IsInitialized)
@@ -50,7 +50,7 @@ extern "C" void UpdateGameAndRender(game_memory *Memory, game_back_buffer *BackB
     Render(BackBuffer, GameState);
 }
 
-extern "C" void GetSoundSamples(game_sound_buffer *SoundBuffer, game_memory *Memory)
+extern "C" GET_SOUND_SAMPLES(GetSoundSamples)
 {
     game_state *GameState= (game_state *)Memory->PermanentStorage;
     // TODO(joe): This is pretty hacky but the real game won't be generating sounds

@@ -5,7 +5,6 @@
 #include <cstdio>
 
 #include "aqcube_platform.h"
-#include "aqcube.cpp" // TODO(joe): reconstruct the code so that this can be completely removed.
 
 struct win32_back_buffer
 {
