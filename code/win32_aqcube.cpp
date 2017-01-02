@@ -256,6 +256,69 @@ inline static float Win32GetElapsedSeconds(LARGE_INTEGER Start, LARGE_INTEGER En
     return Result;
 }
 
+struct win32_game_code
+{
+    HMODULE GameDLL;
+    FILETIME LastWriteTime;
+    char *GameDLLFileName;
+
+    update_game_and_render *UpdateGameAndRender;
+    get_sound_samples *GetSoundSamples;
+
+    bool IsValid;
+};
+
+static FILETIME Win32GetLastWriteTime(char *FileName)
+{
+    FILETIME Result = {};
+
+    WIN32_FILE_ATTRIBUTE_DATA FileAttributes;
+    if (GetFileAttributesExA(FileName, GetFileExInfoStandard, &FileAttributes))
+    {
+        Result = FileAttributes.ftLastWriteTime;
+    }
+
+    return Result;
+}
+
+static void FreeGameCode(win32_game_code *GameCode)
+{
+    GameCode->IsValid = false;
+
+    FreeLibrary(GameCode->GameDLL);
+
+    GameCode->GameDLL = 0;
+    GameCode->UpdateGameAndRender = 0;
+    GameCode->GetSoundSamples = 0;
+}
+
+static win32_game_code Win32LoadGameCode(char *GameFile, char *TempGameFile, char *LockFile)
+{
+    win32_game_code Result = {};
+
+    // NOTE(joe): Make sure that the lock file is gone so we are sure that the
+    // DLL has finished building.
+    WIN32_FILE_ATTRIBUTE_DATA FileAttributes;
+    if (!GetFileAttributesExA(LockFile, GetFileExInfoStandard, &FileAttributes))
+    {
+        CopyFileA(GameFile, TempGameFile, FALSE);
+        HMODULE Handle = LoadLibraryA(TempGameFile);
+        if (Handle)
+        {
+            Result.GameDLLFileName = GameFile;
+            Result.GameDLL = Handle;
+            Result.LastWriteTime = Win32GetLastWriteTime(GameFile);
+
+            Result.UpdateGameAndRender = (update_game_and_render *)GetProcAddress(Result.GameDLL, "UpdateGameAndRender");
+            Result.GetSoundSamples = (get_sound_samples *)GetProcAddress(Result.GameDLL, "GetSoundSamples");
+
+            Result.IsValid = Result.UpdateGameAndRender && Result.GetSoundSamples;
+        }
+    }
+
+    return Result;
+}
+
 static LRESULT CALLBACK Win32MainCallWindowCallback(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam)
 {
     LRESULT Result = 0;
@@ -349,11 +412,6 @@ static void Win32ProcessPendingMessages(game_controller_input *Input)
         }
     }
 }
-typedef void (*UpdateGameAndRenderFunc)(game_memory *Memory, game_back_buffer *BackBuffer, game_sound_buffer *SoundBuffer, game_controller_input *Input);
-typedef void (*GetSoundSamplesFunc)(game_sound_buffer *SoundBuffer, game_memory *Memory);
-
-UpdateGameAndRenderFunc GlobalUpdateGameAndRender;
-GetSoundSamplesFunc GlobalGetSoundSamples;
 
 int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLine, int ShowCode)
 {
@@ -386,14 +444,15 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
             Memory.TransientStorageSize = Gigabytes((uint64)4);
             Memory.TransientStorage = VirtualAlloc(0, Memory.TransientStorageSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 
+            char *GameDLLFileName = "aqcube.dll";
+            char *GameTempDLLFileName = "aqcube_temp.dll";
+            char *GameLockFile = "lock.tmp";
+
             if(Memory.PermanentStorage && Memory.TransientStorage)
             {
-                HMODULE GameHandle = LoadLibraryA("aqcube.dll");
-                if (GameHandle)
+                win32_game_code Game = Win32LoadGameCode(GameDLLFileName, GameTempDLLFileName, GameLockFile);
+                if (Game.IsValid)
                 {
-                    GlobalUpdateGameAndRender = (UpdateGameAndRenderFunc)GetProcAddress(GameHandle, "UpdateGameAndRender");
-                    GlobalGetSoundSamples = (GetSoundSamplesFunc)GetProcAddress(GameHandle, "GetSoundSamples");
-
                     QueryPerformanceFrequency(&GlobalPerfFrequencyCount);
 
                     Win32ResizeBackBuffer(&GlobalBackBuffer, 960, 540);
@@ -422,6 +481,13 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                     GlobalRunning = true;
                     while(GlobalRunning)
                     {
+                        FILETIME GameDLLWriteTime = Win32GetLastWriteTime(GameDLLFileName);
+                        if (CompareFileTime(&Game.LastWriteTime, &GameDLLWriteTime) != 0)
+                        {
+                            FreeGameCode(&Game);
+                            Game = Win32LoadGameCode(GameDLLFileName, GameTempDLLFileName, GameLockFile);
+                        }
+
                         Win32ProcessPendingMessages(&Input);
 
                         DWORD PlayCursor = 0;
@@ -465,8 +531,14 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                         SoundBuffer.SampleCount = BytesToWrite / SoundOutput.BytesPerSample;
                         SoundBuffer.ToneVolume = SoundOutput.ToneVolume;
                         SoundBuffer.SamplesPerSec = SoundOutput.SamplesPerSec;
-                        GlobalUpdateGameAndRender(&Memory, &BackBuffer, &SoundBuffer, &Input);
-                        GlobalGetSoundSamples(&SoundBuffer, &Memory);
+                        if (Game.UpdateGameAndRender)
+                        {
+                            Game.UpdateGameAndRender(&Memory, &BackBuffer, &SoundBuffer, &Input);
+                        }
+                        if (Game.GetSoundSamples)
+                        {
+                            Game.GetSoundSamples(&SoundBuffer, &Memory);
+                        }
 
                         if (OutputSound)
                         {
