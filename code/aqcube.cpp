@@ -50,6 +50,7 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
     Render(BackBuffer, GameState);
 }
 
+// TODO(joe): This function will need to be performant.
 extern "C" GET_SOUND_SAMPLES(GetSoundSamples)
 {
     game_state *GameState= (game_state *)Memory->PermanentStorage;

@@ -79,10 +79,10 @@ typedef struct game_sound_buffer
     int16 *Samples;
     int SampleCount;
     int16 ToneVolume;
-    int16 SamplesPerSec;
+    uint16 SamplesPerSec;
 } game_sound_buffer;
 
-#define UPDATE_GAME_AND_RENDER(name) void (name)(game_memory *Memory, game_back_buffer *BackBuffer, game_sound_buffer *SoundBuffer, game_controller_input *Input)
+#define UPDATE_GAME_AND_RENDER(name) void (name)(game_memory *Memory, game_back_buffer *BackBuffer, game_controller_input *Input)
 typedef UPDATE_GAME_AND_RENDER(update_game_and_render);
 
 #define GET_SOUND_SAMPLES(name) void (name)(game_sound_buffer *SoundBuffer, game_memory *Memory)
