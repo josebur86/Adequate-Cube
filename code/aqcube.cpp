@@ -1,20 +1,46 @@
 #include "aqcube.h"
 
-#include <cmath>
+#include <assert.h>
+#include <math.h>
+
+static void ClearBuffer(game_back_buffer *BackBuffer, uint8 R, uint8 G, uint8 B)
+{
+    int8 *Row = (int8 *)BackBuffer->Memory;
+    for (int YIndex = 0; YIndex < BackBuffer->Height; ++YIndex)
+    {
+        int32 *Pixel = (int32 *)Row;
+        for (int XIndex = 0; XIndex < BackBuffer->Width; ++XIndex)
+        {
+            *Pixel++ = (R << 16) | (G << 8) | (B << 0);
+        }
+
+        Row += BackBuffer->Pitch;
+    }
+}
+
+static void DrawRectangle(game_back_buffer *BackBuffer,
+                          int X, int Y, int Width, int Height,
+                          uint8 R, uint8 G, uint8 B)
+{
+    for (int YIndex = 0; YIndex < Height; ++YIndex)
+    {
+        uint32 *Pixel = (uint32 *)BackBuffer->Memory + ((Y+YIndex)*BackBuffer->Width) + X;
+        for (int XIndex = 0; XIndex < Width; ++XIndex)
+        {
+            if (X + XIndex < BackBuffer->Width && X + XIndex >= 0 &&
+                Y + YIndex < BackBuffer->Height && Y + YIndex >= 0)
+            {
+                *Pixel = (R << 16) | (G << 8) | (B << 0);
+            }
+            ++Pixel;
+        }
+    }
+}
 
 static void Render(game_back_buffer *BackBuffer, game_state *GameState)
 {
-    int32 *Pixel = (int32 *)BackBuffer->Memory;
-    for (int YIndex = 0; YIndex < BackBuffer->Height; ++YIndex)
-    {
-        for (int XIndex = 0; XIndex < BackBuffer->Width; ++XIndex)
-        {
-            uint8 b = (uint8)(GameState->OffsetX + XIndex);
-            uint8 g = (uint8)(GameState->OffsetY + YIndex);
-            uint8 r = (uint8)(GameState->OffsetX + XIndex + GameState->OffsetY + YIndex);
-            *Pixel++ = (b << 0 | g << 8 | r << 16);
-        }
-    }
+    ClearBuffer(BackBuffer, 0, 43, 54);
+    DrawRectangle(BackBuffer, GameState->OffsetX, GameState->OffsetY, 80, 40, 181, 137, 0);
 }
 
 extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)

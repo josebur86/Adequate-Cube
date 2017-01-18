@@ -4,7 +4,7 @@
 extern "C" {
 #endif
 
-#include <cstdint>
+#include <stdint.h>
 
 // TODO(joe): Still trying to decide what kind of type names I like.
 typedef int8_t int8;

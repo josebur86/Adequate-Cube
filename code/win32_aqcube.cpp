@@ -1,8 +1,8 @@
 #include <windows.h>
 #include <dsound.h>
 
-#include <cassert>
-#include <cstdio>
+#include <assert.h>
+#include <stdio.h>
 
 #include "aqcube_platform.h"
 
@@ -717,7 +717,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
 
                         LARGE_INTEGER EndCount = Win32GetClock();
 
-#if 0
+#if 1
                         char FrameTimeString[255];
                         float MSPerFrame = 1000.0f * Win32GetElapsedSeconds(LastFrameCount, EndCount);
                         float FPS = 1000.0f / MSPerFrame;
