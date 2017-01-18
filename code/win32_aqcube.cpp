@@ -492,7 +492,7 @@ void DebugDrawSoundBuffer(win32_back_buffer ScreenBuffer, game_sound_buffer *Sou
 int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLine, int ShowCode)
 {
     WNDCLASSA WindowClass = {};
-    WindowClass.style = CS_HREDRAW | CS_VREDRAW;
+    WindowClass.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
     WindowClass.lpfnWndProc = Win32MainCallWindowCallback;
     WindowClass.hInstance = Instance;
     WindowClass.hCursor = LoadCursor(0, IDC_ARROW);
@@ -514,6 +514,8 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                                       0);
         if (Window)
         {
+            HDC DeviceContext = GetDC(Window);
+
             game_memory Memory = {};
             Memory.PermanentStorageSize = Megabytes(64);
             Memory.PermanentStorage = VirtualAlloc(0, Memory.PermanentStorageSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
@@ -726,11 +728,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
 #endif
                         LastFrameCount = EndCount;
 
-                        // TODO(joe): Weird issue: After the app is out of focus for a while the DeviceContext
-                        // becomes NULL and we can no longer paint to the screen. WM_APPACTIVATE?
-                        HDC DeviceContext = GetDC(Window);
                         Win32PaintBackBuffer(DeviceContext, &GlobalBackBuffer);
-                        ReleaseDC(Window, DeviceContext);
                     }
                 }
                 else
@@ -738,6 +736,8 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                     // TODO(joe): Log that we couldn't load the game handle.
                 }
             }
+
+            ReleaseDC(Window, DeviceContext);
         }
     }
 
