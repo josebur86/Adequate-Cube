@@ -47,14 +47,6 @@ typedef struct game_memory
     bool IsInitialized;
 } game_memory;
 
-typedef struct game_state
-{
-    int OffsetX;
-    int OffsetY;
-
-    int ToneHz;
-} game_state;
-
 typedef struct button_state
 {
     bool IsDown;

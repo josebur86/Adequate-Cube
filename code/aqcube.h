@@ -14,3 +14,13 @@
 
 #include "aqcube_platform.h"
 
+struct game_state
+{
+    int ShipPosX;
+    int ShipPosY;
+    int ShipWidth;
+    int ShipHeight;
+
+    int ToneHz;
+};
+

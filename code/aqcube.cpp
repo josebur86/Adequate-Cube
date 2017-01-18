@@ -40,7 +40,10 @@ static void DrawRectangle(game_back_buffer *BackBuffer,
 static void Render(game_back_buffer *BackBuffer, game_state *GameState)
 {
     ClearBuffer(BackBuffer, 0, 43, 54);
-    DrawRectangle(BackBuffer, GameState->OffsetX, GameState->OffsetY, 80, 40, 181, 137, 0);
+    DrawRectangle(BackBuffer,
+                  GameState->ShipPosX, GameState->ShipPosY,
+                  GameState->ShipWidth, GameState->ShipHeight,
+                  181, 137, 0);
 }
 
 extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
@@ -48,29 +51,50 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
     game_state *GameState= (game_state *)Memory->PermanentStorage;
     if (!Memory->IsInitialized)
     {
-        GameState->OffsetX = 0;
-        GameState->OffsetY = 0;
+        GameState->ShipPosX = 0;
+        GameState->ShipPosY = 0;
+        GameState->ShipWidth = 80;
+        GameState->ShipHeight = 40;
+
         GameState->ToneHz = 256;
 
         Memory->IsInitialized = true;
     }
     if (Input->Up.IsDown)
     {
-        GameState->OffsetY -= 10;
+        GameState->ShipPosY -= 10;
+        if (GameState->ShipPosY < 0)
+        {
+            GameState->ShipPosY = 0;
+        }
+
         GameState->ToneHz += 10;
     }
     if (Input->Down.IsDown)
     {
-        GameState->OffsetY += 10;
+        GameState->ShipPosY += 10;
+        if (GameState->ShipPosY + GameState->ShipHeight >= BackBuffer->Height)
+        {
+            GameState->ShipPosY = BackBuffer->Height - GameState->ShipHeight - 1;
+        }
+
         GameState->ToneHz -= 10;
     }
     if (Input->Left.IsDown)
     {
-        GameState->OffsetX -= 10;
+        GameState->ShipPosX -= 10;
+        if (GameState->ShipPosX < 0)
+        {
+            GameState->ShipPosX = 0;
+        }
     }
     if (Input->Right.IsDown)
     {
-        GameState->OffsetX += 10;
+        GameState->ShipPosX += 10;
+        if (GameState->ShipPosX + GameState->ShipWidth >= BackBuffer->Width)
+        {
+            GameState->ShipPosX = BackBuffer->Width - GameState->ShipWidth - 1;
+        }
     }
 
     Render(BackBuffer, GameState);
