@@ -493,6 +493,8 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                         }
 
                         Win32ProcessPendingMessages(&Input);
+                        Input.dt = TargetFrameSeconds; // TODO(joe): Should we measure this instead
+                                                       //            of assuming a constant frame time?
 
                         game_back_buffer BackBuffer = {};
                         BackBuffer.Memory = GlobalBackBuffer.Memory;

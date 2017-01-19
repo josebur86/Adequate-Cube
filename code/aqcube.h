@@ -13,13 +13,22 @@
  */
 
 #include "aqcube_platform.h"
+#include "aqcube_math.h"
+
+//
+// Entity
+//
+struct entity
+{
+    vector2 Size;
+
+    vector2 P;
+    vector2 dP; // Unit Per Second
+};
 
 struct game_state
 {
-    int ShipPosX;
-    int ShipPosY;
-    int ShipWidth;
-    int ShipHeight;
+    entity Ship;
 
     int ToneHz;
 };

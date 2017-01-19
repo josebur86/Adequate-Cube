@@ -53,6 +53,8 @@ typedef struct button_state
 } button_state;
 typedef struct game_controller_input
 {
+    float dt;
+
     button_state Up;
     button_state Down;
     button_state Left;

@@ -3,6 +3,10 @@
 #include <assert.h>
 #include <math.h>
 
+//
+// Rendering
+//
+
 static void ClearBuffer(game_back_buffer *BackBuffer, uint8 R, uint8 G, uint8 B)
 {
     int8 *Row = (int8 *)BackBuffer->Memory;
@@ -40,9 +44,11 @@ static void DrawRectangle(game_back_buffer *BackBuffer,
 static void Render(game_back_buffer *BackBuffer, game_state *GameState)
 {
     ClearBuffer(BackBuffer, 0, 43, 54);
+
+    entity Ship = GameState->Ship;
     DrawRectangle(BackBuffer,
-                  GameState->ShipPosX, GameState->ShipPosY,
-                  GameState->ShipWidth, GameState->ShipHeight,
+                  (int)Ship.P.X, (int)Ship.P.Y,
+                  (int)Ship.Size.X, (int)Ship.Size.Y,
                   181, 137, 0);
 }
 
@@ -51,15 +57,78 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
     game_state *GameState= (game_state *)Memory->PermanentStorage;
     if (!Memory->IsInitialized)
     {
-        GameState->ShipPosX = 0;
-        GameState->ShipPosY = 0;
-        GameState->ShipWidth = 80;
-        GameState->ShipHeight = 40;
+        GameState->Ship.P.X = (float)BackBuffer->Width / 2;
+        GameState->Ship.P.Y = (float)BackBuffer->Height / 2;
+        GameState->Ship.Size.X = 80.0f;
+        GameState->Ship.Size.Y = 40.0f;
 
         GameState->ToneHz = 256;
 
         Memory->IsInitialized = true;
     }
+
+    entity *Ship = &GameState->Ship;
+
+#define MAX_VELOCITY 900.0f
+#define VELOCITY_STEP 100.0f
+
+    if (Input->Down.IsDown)
+    {
+        Ship->dP.Y += VELOCITY_STEP;
+        if (Ship->dP.Y > MAX_VELOCITY)
+        {
+            Ship->dP.Y = MAX_VELOCITY;
+        }
+    }
+    else if (Input->Up.IsDown)
+    {
+        Ship->dP.Y += -VELOCITY_STEP;
+        if (Ship->dP.Y < -MAX_VELOCITY)
+        {
+            Ship->dP.Y = -MAX_VELOCITY;
+        }
+    }
+
+    if (Input->Right.IsDown)
+    {
+        Ship->dP.X += VELOCITY_STEP;
+        if (Ship->dP.X > MAX_VELOCITY)
+        {
+            Ship->dP.X = MAX_VELOCITY;
+        }
+    }
+    else if (Input->Left.IsDown)
+    {
+        Ship->dP.X += -VELOCITY_STEP;
+        if (Ship->dP.X < -MAX_VELOCITY)
+        {
+            Ship->dP.X = -MAX_VELOCITY;
+        }
+    }
+
+    Ship->P = (Ship->P + Ship->dP*Input->dt);
+    if (Ship->P.X < 0.0)
+    {
+        Ship->P.X = 0.0f;
+        Ship->dP.X = 0.0f;
+    }
+    if (Ship->P.Y < 0.0)
+    {
+        Ship->P.Y = 0.0f;
+        Ship->dP.Y = 0.0f;
+    }
+    if (Ship->P.X + Ship->Size.X >= BackBuffer->Width)
+    {
+        Ship->P.X = BackBuffer->Width - Ship->Size.X - 1.0f;
+        Ship->dP.X = 0.0f;
+    }
+    if (Ship->P.Y + Ship->Size.Y >= BackBuffer->Height)
+    {
+        Ship->P.Y = BackBuffer->Height - Ship->Size.Y - 1.0f;
+        Ship->dP.Y = 0.0f;
+    }
+
+#if 0
     if (Input->Up.IsDown)
     {
         GameState->ShipPosY -= 10;
@@ -96,6 +165,7 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
             GameState->ShipPosX = BackBuffer->Width - GameState->ShipWidth - 1;
         }
     }
+#endif
 
     Render(BackBuffer, GameState);
 }
