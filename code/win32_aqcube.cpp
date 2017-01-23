@@ -564,6 +564,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                             SoundBuffer.ToneVolume = SoundOutput.ToneVolume;
                             SoundBuffer.SamplesPerSec = SoundOutput.SamplesPerSec;
 
+#if 0
                             if (Game.GetSoundSamples)
                             {
                                 Game.GetSoundSamples(&SoundBuffer, &Memory);
@@ -572,6 +573,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                             {
                                 Win32WriteToSoundBuffer(&SoundBuffer, &SoundOutput, ByteToLock, BytesToWrite);
                             }
+#endif
                             VirtualFree(SoundBuffer.Samples, 0, MEM_RELEASE);
                         }
                         else
