@@ -23,8 +23,18 @@ int main(int argc, char** argv)
         printf("Window created!\n");
     }
 
-    while (1)
+    bool GlobalRunning = true;
+
+    while (GlobalRunning)
     {
+        SDL_Event Event;
+        while (SDL_PollEvent(&Event))
+        {
+            if (Event.type == SDL_QUIT)
+            {
+                GlobalRunning = false;
+            }
+        }
     }
 
     SDL_DestroyWindow(Window);
