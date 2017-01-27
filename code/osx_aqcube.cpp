@@ -1,6 +1,28 @@
 #include "SDL2/SDL.h"
 
+#include <assert.h>
 #include <stdio.h>
+
+#include "aqcube_platform.h"
+
+static void OSX_RenderGradient(void *Pixels, int Width, int Height)
+{
+    assert(Pixels);
+
+    int *Pixel = (int *)Pixels;
+    for (int HeightIndex = 0; HeightIndex < Height; ++HeightIndex)
+    {
+        for (int WidthIndex = 0; WidthIndex < Width; ++WidthIndex)
+        {
+            int8 R = (int8)WidthIndex;
+            int8 G = (int8)HeightIndex;
+            int8 B = (int8)WidthIndex+HeightIndex;
+            int Color = (R << 16) | (G << 8) | (B << 0);
+
+            *Pixel++ = Color;
+        }
+    }
+}
 
 int main(int argc, char** argv)
 {
@@ -21,22 +43,37 @@ int main(int argc, char** argv)
     if (Window)
     {
         printf("Window created!\n");
-    }
 
-    bool GlobalRunning = true;
-
-    while (GlobalRunning)
-    {
-        SDL_Event Event;
-        while (SDL_PollEvent(&Event))
+        // TODO(joe): Allocate video memory.
+        SDL_Surface *Surface = SDL_GetWindowSurface(Window);
+        if (Surface)
         {
-            if (Event.type == SDL_QUIT)
+            SDL_PixelFormat *Format = Surface->format;
+            printf("W: %i H: %i BPP: %i\n", Surface->w, Surface->h, Format->BitsPerPixel);
+
+            // TODO(joe): Allocate game memory.
+            // TODO(joe): Compile the game code into it's on .so file.
+
+            bool GlobalRunning = true;
+            while (GlobalRunning)
             {
-                GlobalRunning = false;
+                SDL_Event Event;
+                while (SDL_PollEvent(&Event))
+                {
+                    if (Event.type == SDL_QUIT)
+                    {
+                        GlobalRunning = false;
+                    }
+                }
+
+                OSX_RenderGradient(Surface->pixels, Surface->w, Surface->h);
+
+                SDL_UpdateWindowSurface(Window);
             }
         }
+
+        SDL_DestroyWindow(Window);
     }
 
-    SDL_DestroyWindow(Window);
     return 0;
 }

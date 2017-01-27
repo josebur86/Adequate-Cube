@@ -9,6 +9,6 @@ if [ ! -d ../build ]; then
 fi
 pushd ../build
 
-clang++ ../code/osx_aqcube.cpp -L../code/libs -lSDL2 -o osx_aqcube
+clang++ -g -O0 ../code/osx_aqcube.cpp -L../code/libs -lSDL2 -o osx_aqcube
 
 popd
