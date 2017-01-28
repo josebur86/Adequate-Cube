@@ -2,6 +2,8 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <sys/mman.h>
+#include <sys/types.h>
 
 #include "aqcube_platform.h"
 
@@ -114,35 +116,44 @@ int main(int argc, char** argv)
         SDL_Surface *Surface = SDL_GetWindowSurface(Window);
         if (Surface)
         {
-            // TODO(joe): Allocate game memory.
             // TODO(joe): Lock that update loop to 30 fps.
+            
             // TODO(joe): Compile the game code into it's on .so file.
+            
+            game_memory Memory = {};
+            Memory.PermanentStorageSize = Megabytes(64);
+            Memory.PermanentStorage = mmap(0, Memory.PermanentStorageSize, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+            Memory.TransientStorageSize = Gigabytes((uint64)4);
+            Memory.TransientStorage = mmap(0, Memory.TransientStorageSize, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
 
-            game_controller_input Input = {}; 
-
-            while (GlobalRunning)
+            if (Memory.PermanentStorage && Memory.TransientStorage)
             {
-                OSX_ProcessInput(&Input);
-                if (Input.Up.IsDown)
-                {
-                    GlobalY -= 10;
-                }
-                if (Input.Down.IsDown)
-                {
-                    GlobalY += 10;
-                }
-                if (Input.Left.IsDown)
-                {
-                    GlobalX -= 10;
-                }
-                if (Input.Right.IsDown)
-                {
-                    GlobalX += 10;
-                }
+                game_controller_input Input = {}; 
 
-                OSX_RenderGradient(Surface->pixels, Surface->w, Surface->h);
+                while (GlobalRunning)
+                {
+                    OSX_ProcessInput(&Input);
+                    if (Input.Up.IsDown)
+                    {
+                        GlobalY -= 10;
+                    }
+                    if (Input.Down.IsDown)
+                    {
+                        GlobalY += 10;
+                    }
+                    if (Input.Left.IsDown)
+                    {
+                        GlobalX -= 10;
+                    }
+                    if (Input.Right.IsDown)
+                    {
+                        GlobalX += 10;
+                    }
 
-                SDL_UpdateWindowSurface(Window);
+                    OSX_RenderGradient(Surface->pixels, Surface->w, Surface->h);
+
+                    SDL_UpdateWindowSurface(Window);
+                }
             }
         }
         else
