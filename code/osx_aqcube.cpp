@@ -5,6 +5,11 @@
 
 #include "aqcube_platform.h"
 
+bool GlobalRunning = true;
+
+int GlobalX = 0;
+int GlobalY = 0;
+
 static void OSX_RenderGradient(void *Pixels, int Width, int Height)
 {
     assert(Pixels);
@@ -16,10 +21,77 @@ static void OSX_RenderGradient(void *Pixels, int Width, int Height)
         {
             uint8 R = (uint8)WidthIndex;
             uint8 G = (uint8)HeightIndex;
-            uint8 B = (uint8)WidthIndex + 256 + (uint)HeightIndex + 128;
+            uint8 B = (uint8)WidthIndex + GlobalX + (uint)HeightIndex + GlobalY;
             uint Color = (R << 16) | (G << 8) | (B << 0);
 
             *Pixel++ = Color;
+        }
+    }
+}
+
+static void OSX_ProcessButtonState(button_state *Button, bool IsDown)
+{
+    assert(Button->IsDown != IsDown);
+    Button->IsDown = IsDown;
+}
+
+static void OSX_ProcessInput(game_controller_input *Input)
+{
+    SDL_Event Event;
+    while (SDL_PollEvent(&Event))
+    {
+        switch(Event.type)
+        {
+            case SDL_QUIT:
+            {
+                GlobalRunning = false;
+            } break;
+            case SDL_KEYDOWN:
+            {
+                if (!Event.key.repeat)
+                {
+                    SDL_Keycode KeyCode = Event.key.keysym.sym;
+                    if (KeyCode == SDLK_w)
+                    {
+                        OSX_ProcessButtonState(&Input->Up, true);
+                    }
+                    else if (KeyCode == SDLK_s)
+                    {
+                        OSX_ProcessButtonState(&Input->Down, true);
+                    }
+                    else if (KeyCode == SDLK_a)
+                    {
+                        OSX_ProcessButtonState(&Input->Left, true);
+                    }
+                    else if (KeyCode == SDLK_d)
+                    {
+                        OSX_ProcessButtonState(&Input->Right, true);
+                    }
+                }
+            } break;
+            case SDL_KEYUP:
+            {
+                if (!Event.key.repeat)
+                {
+                    SDL_Keycode KeyCode = Event.key.keysym.sym;
+                    if (KeyCode == SDLK_w)
+                    {
+                        OSX_ProcessButtonState(&Input->Up, false);
+                    }
+                    else if (KeyCode == SDLK_s)
+                    {
+                        OSX_ProcessButtonState(&Input->Down, false);
+                    }
+                    else if (KeyCode == SDLK_a)
+                    {
+                        OSX_ProcessButtonState(&Input->Left, false);
+                    }
+                    else if (KeyCode == SDLK_d)
+                    {
+                        OSX_ProcessButtonState(&Input->Right, false);
+                    }
+                }
+            } break;
         }
     }
 }
@@ -46,16 +118,26 @@ int main(int argc, char** argv)
             // TODO(joe): Lock that update loop to 30 fps.
             // TODO(joe): Compile the game code into it's on .so file.
 
-            bool GlobalRunning = true;
+            game_controller_input Input = {}; 
+
             while (GlobalRunning)
             {
-                SDL_Event Event;
-                while (SDL_PollEvent(&Event))
+                OSX_ProcessInput(&Input);
+                if (Input.Up.IsDown)
                 {
-                    if (Event.type == SDL_QUIT)
-                    {
-                        GlobalRunning = false;
-                    }
+                    GlobalY -= 10;
+                }
+                if (Input.Down.IsDown)
+                {
+                    GlobalY += 10;
+                }
+                if (Input.Left.IsDown)
+                {
+                    GlobalX -= 10;
+                }
+                if (Input.Right.IsDown)
+                {
+                    GlobalX += 10;
                 }
 
                 OSX_RenderGradient(Surface->pixels, Surface->w, Surface->h);
