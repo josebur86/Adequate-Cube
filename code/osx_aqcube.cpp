@@ -106,7 +106,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    SDL_Window *Window = SDL_CreateWindow("Adequate Cube", 
+    SDL_Window *Window = SDL_CreateWindow("Adequate Cube",
                                           SDL_WINDOWPOS_UNDEFINED,
                                           SDL_WINDOWPOS_UNDEFINED,
                                           800, 600,
@@ -117,9 +117,9 @@ int main(int argc, char** argv)
         if (Surface)
         {
             // TODO(joe): Lock that update loop to 30 fps.
-            
+
             // TODO(joe): Compile the game code into it's on .so file.
-            
+
             game_memory Memory = {};
             Memory.PermanentStorageSize = Megabytes(64);
             Memory.PermanentStorage = mmap(0, Memory.PermanentStorageSize, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
@@ -128,7 +128,7 @@ int main(int argc, char** argv)
 
             if (Memory.PermanentStorage && Memory.TransientStorage)
             {
-                game_controller_input Input = {}; 
+                game_controller_input Input = {};
 
                 while (GlobalRunning)
                 {
