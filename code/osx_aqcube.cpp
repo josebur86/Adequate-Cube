@@ -7,6 +7,7 @@
 
 #include "aqcube_platform.h"
 
+uint64 GlobalTimerFreq;
 bool GlobalRunning = true;
 
 int GlobalX = 0;
@@ -98,6 +99,13 @@ static void OSX_ProcessInput(game_controller_input *Input)
     }
 }
 
+static float OSX_GetElapsedSeconds(uint64 Start, uint64 End)
+{
+    float Result = ((float)(End - Start)) / (float)GlobalTimerFreq;
+
+    return Result;
+}
+
 int main(int argc, char** argv)
 {
     if (SDL_Init(SDL_INIT_VIDEO) < 0)
@@ -105,6 +113,8 @@ int main(int argc, char** argv)
         printf("Unable to initialize SDL!\n");
         return 1;
     }
+
+    GlobalTimerFreq = SDL_GetPerformanceFrequency();
 
     SDL_Window *Window = SDL_CreateWindow("Adequate Cube",
                                           SDL_WINDOWPOS_UNDEFINED,
@@ -117,7 +127,6 @@ int main(int argc, char** argv)
         if (Surface)
         {
             // TODO(joe): Lock that update loop to 30 fps.
-
             // TODO(joe): Compile the game code into it's on .so file.
 
             game_memory Memory = {};
@@ -128,8 +137,19 @@ int main(int argc, char** argv)
 
             if (Memory.PermanentStorage && Memory.TransientStorage)
             {
+#if 1
+                    //UINT TimerResolutionMS = 1;
+
+                    int MonitorHz = 60;
+                    int GameUpdateHz = MonitorHz / 2;
+                    float TargetFrameSeconds = 1.0f / (float)GameUpdateHz;
+
+                    //bool TimeIsGranular = timeBeginPeriod(TimerResolutionMS) == TIMERR_NOERROR;
+#endif
+
                 game_controller_input Input = {};
 
+                uint64 LastFrameTime = SDL_GetPerformanceCounter();
                 while (GlobalRunning)
                 {
                     OSX_ProcessInput(&Input);
@@ -152,7 +172,29 @@ int main(int argc, char** argv)
 
                     OSX_RenderGradient(Surface->pixels, Surface->w, Surface->h);
 
+                    uint64 FrameTime = SDL_GetPerformanceCounter();
+                    LastFrameTime = FrameTime;
+
+                    float ElapsedTime = OSX_GetElapsedSeconds(LastFrameTime, FrameTime);
+                    if (ElapsedTime < TargetFrameSeconds)
+                    {
+                        uint32 TimeToSleep = (uint32)(1000.0f * (TargetFrameSeconds - ElapsedTime));
+                        if (TimeToSleep > 0)
+                        {
+                            SDL_Delay(TimeToSleep);
+                        }
+
+                        while (ElapsedTime < TargetFrameSeconds)
+                        {
+                            ElapsedTime = OSX_GetElapsedSeconds(LastFrameTime, SDL_GetPerformanceCounter());
+
+                        }
+                    }
+
+
                     SDL_UpdateWindowSurface(Window);
+
+                    printf("FrameTime %f\n", ElapsedTime);
                 }
             }
         }
