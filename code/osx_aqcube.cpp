@@ -149,7 +149,7 @@ int main(int argc, char** argv)
 
                 game_controller_input Input = {};
 
-                uint64 LastFrameTime = SDL_GetPerformanceCounter();
+                uint64 LastFrameCount = SDL_GetPerformanceCounter();
                 while (GlobalRunning)
                 {
                     OSX_ProcessInput(&Input);
@@ -172,10 +172,8 @@ int main(int argc, char** argv)
 
                     OSX_RenderGradient(Surface->pixels, Surface->w, Surface->h);
 
-                    uint64 FrameTime = SDL_GetPerformanceCounter();
-                    LastFrameTime = FrameTime;
-
-                    float ElapsedTime = OSX_GetElapsedSeconds(LastFrameTime, FrameTime);
+                    uint64 FrameCount = SDL_GetPerformanceCounter();
+                    float ElapsedTime = OSX_GetElapsedSeconds(LastFrameCount, FrameCount);
                     if (ElapsedTime < TargetFrameSeconds)
                     {
                         uint32 TimeToSleep = (uint32)(1000.0f * (TargetFrameSeconds - ElapsedTime));
@@ -184,17 +182,28 @@ int main(int argc, char** argv)
                             SDL_Delay(TimeToSleep);
                         }
 
+                        ElapsedTime = OSX_GetElapsedSeconds(LastFrameCount, SDL_GetPerformanceCounter());
                         while (ElapsedTime < TargetFrameSeconds)
                         {
-                            ElapsedTime = OSX_GetElapsedSeconds(LastFrameTime, SDL_GetPerformanceCounter());
-
+                            ElapsedTime = OSX_GetElapsedSeconds(LastFrameCount, SDL_GetPerformanceCounter());
                         }
+                    }
+                    else
+                    {
+                        // TODO(joe): Log that we missed a frame.
+                        printf("Missed frame!");
                     }
 
 
-                    SDL_UpdateWindowSurface(Window);
+                    uint64 EndCount = SDL_GetPerformanceCounter();
+#if 1
+                    float MSPerFrame = 1000.0f * OSX_GetElapsedSeconds(LastFrameCount, EndCount);
+                    float FPS = 1000.0f / MSPerFrame;
+                    printf("ms/f: %.2f f/s: %.2f \n", MSPerFrame, FPS);
+#endif
+                    LastFrameCount = EndCount;
 
-                    printf("FrameTime %f\n", ElapsedTime);
+                    SDL_UpdateWindowSurface(Window);
                 }
             }
         }
