@@ -126,7 +126,6 @@ int main(int argc, char** argv)
         SDL_Surface *Surface = SDL_GetWindowSurface(Window);
         if (Surface)
         {
-            // TODO(joe): Lock that update loop to 30 fps.
             // TODO(joe): Compile the game code into it's on .so file.
 
             game_memory Memory = {};
@@ -137,15 +136,9 @@ int main(int argc, char** argv)
 
             if (Memory.PermanentStorage && Memory.TransientStorage)
             {
-#if 1
-                    //UINT TimerResolutionMS = 1;
-
-                    int MonitorHz = 60;
-                    int GameUpdateHz = MonitorHz / 2;
-                    float TargetFrameSeconds = 1.0f / (float)GameUpdateHz;
-
-                    //bool TimeIsGranular = timeBeginPeriod(TimerResolutionMS) == TIMERR_NOERROR;
-#endif
+                int MonitorHz = 60;
+                int GameUpdateHz = MonitorHz / 2;
+                float TargetFrameSeconds = 1.0f / (float)GameUpdateHz;
 
                 game_controller_input Input = {};
 
