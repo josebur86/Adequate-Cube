@@ -11,7 +11,7 @@ pushd ../build > /dev/null
 
 CompilerFlags="-std=c++11 -g -O0"
 
-clang++ $CompilerFlags -shared -fpic ../code/aqcube.cpp -o aqcube.so
+clang++ $CompilerFlags -shared -fpic ../code/aqcube.cpp -o libaqcube.so
 clang++ $CompilerFlags ../code/osx_aqcube.cpp -L../code/libs -lSDL2 -o osx_aqcube
 
 popd > /dev/null
