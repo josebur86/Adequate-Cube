@@ -70,43 +70,34 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
     entity *Ship = &GameState->Ship;
 
 #define MAX_VELOCITY 900.0f
-#define VELOCITY_STEP 100.0f
+
+    vector2 ddP = {0.0f, 0.0f};
 
     if (Input->Down.IsDown)
     {
-        Ship->dP.Y += VELOCITY_STEP;
-        if (Ship->dP.Y > MAX_VELOCITY)
-        {
-            Ship->dP.Y = MAX_VELOCITY;
-        }
+        ddP.Y = 1.0f;
     }
-    else if (Input->Up.IsDown)
+    if (Input->Up.IsDown)
     {
-        Ship->dP.Y += -VELOCITY_STEP;
-        if (Ship->dP.Y < -MAX_VELOCITY)
-        {
-            Ship->dP.Y = -MAX_VELOCITY;
-        }
+        ddP.Y = -1.0f;
     }
-
     if (Input->Right.IsDown)
     {
-        Ship->dP.X += VELOCITY_STEP;
-        if (Ship->dP.X > MAX_VELOCITY)
-        {
-            Ship->dP.X = MAX_VELOCITY;
-        }
+        ddP.X = 1.0f;
     }
-    else if (Input->Left.IsDown)
+    if (Input->Left.IsDown)
     {
-        Ship->dP.X += -VELOCITY_STEP;
-        if (Ship->dP.X < -MAX_VELOCITY)
-        {
-            Ship->dP.X = -MAX_VELOCITY;
-        }
+        ddP.X = -1.0f;
     }
+    float ShipSpeed = 1000.0f; // pixels / sec^2
+    ddP = ddP * ShipSpeed; // TODO(joe): Overload *= for vectors
+    ddP = -2.0f*Ship->dP + ddP;
 
-    Ship->P = (Ship->P + Ship->dP*Input->dt);
+    // TODO(joe): I think there is a diagonal motion issue.
+
+    Ship->P = (0.5f * ddP * Square(Input->dt)) + (Ship->dP * Input->dt) + Ship->P;
+    Ship->dP = (ddP*Input->dt) + Ship->dP;
+
     if (Ship->P.X < 0.0)
     {
         Ship->P.X = 0.0f;
@@ -127,45 +118,6 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
         Ship->P.Y = BackBuffer->Height - Ship->Size.Y - 1.0f;
         Ship->dP.Y = 0.0f;
     }
-
-#if 0
-    if (Input->Up.IsDown)
-    {
-        GameState->ShipPosY -= 10;
-        if (GameState->ShipPosY < 0)
-        {
-            GameState->ShipPosY = 0;
-        }
-
-        GameState->ToneHz += 10;
-    }
-    if (Input->Down.IsDown)
-    {
-        GameState->ShipPosY += 10;
-        if (GameState->ShipPosY + GameState->ShipHeight >= BackBuffer->Height)
-        {
-            GameState->ShipPosY = BackBuffer->Height - GameState->ShipHeight - 1;
-        }
-
-        GameState->ToneHz -= 10;
-    }
-    if (Input->Left.IsDown)
-    {
-        GameState->ShipPosX -= 10;
-        if (GameState->ShipPosX < 0)
-        {
-            GameState->ShipPosX = 0;
-        }
-    }
-    if (Input->Right.IsDown)
-    {
-        GameState->ShipPosX += 10;
-        if (GameState->ShipPosX + GameState->ShipWidth >= BackBuffer->Width)
-        {
-            GameState->ShipPosX = BackBuffer->Width - GameState->ShipWidth - 1;
-        }
-    }
-#endif
 
     Render(BackBuffer, GameState);
 }
