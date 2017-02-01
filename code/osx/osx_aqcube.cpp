@@ -6,7 +6,7 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 
-#include "aqcube_platform.h"
+#include "../aqcube_platform.h" // TODO(joe): I'm not sure if I like that this is needed.
 
 uint64 GlobalTimerFreq;
 bool GlobalRunning = true;
