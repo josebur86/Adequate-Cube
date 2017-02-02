@@ -12,8 +12,8 @@
  *    game::state could be interesting...
  */
 
-#include "aqcube_platform.h"
 #include "aqcube_math.h"
+#include "aqcube_platform.h"
 
 //
 // Entity

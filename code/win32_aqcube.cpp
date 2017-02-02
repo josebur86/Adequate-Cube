@@ -114,16 +114,17 @@ static void Win32ResizeBackBuffer(win32_back_buffer *Buffer, int Width, int Heig
     Buffer->Info.bmiHeader.biHeight = Buffer->Height;
     // TODO(joe): Treat the buffer as top-down for now. It might be better to
     // treat the back buffer as bottom up in the future.
-    Buffer->Info.bmiHeader.biHeight      = -Buffer->Height;
-    Buffer->Info.bmiHeader.biPlanes      = 1;
-    Buffer->Info.bmiHeader.biBitCount    = 32;
-    Buffer->Info.bmiHeader.biCompression = BI_RGB; // Uncompressed: The value for blue is in the least significant 8
-                                                   // bits, followed by 8 bits each for green and red.
+    Buffer->Info.bmiHeader.biHeight   = -Buffer->Height;
+    Buffer->Info.bmiHeader.biPlanes   = 1;
+    Buffer->Info.bmiHeader.biBitCount = 32;
+
+    // Uncompressed: The value for blue is in the least significant 8
+    // bits, followed by 8 bits each for green and red.
     // BB GG RR XX
-    //
-    Buffer->Pitch        = Buffer->Width * Buffer->BytesPerPixel;
-    int BufferMemorySize = Buffer->Height * Buffer->Width * Buffer->BytesPerPixel;
-    Buffer->Memory       = VirtualAlloc(0, BufferMemorySize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    Buffer->Info.bmiHeader.biCompression = BI_RGB;
+    Buffer->Pitch                        = Buffer->Width * Buffer->BytesPerPixel;
+    int BufferMemorySize                 = Buffer->Height * Buffer->Width * Buffer->BytesPerPixel;
+    Buffer->Memory                       = VirtualAlloc(0, BufferMemorySize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 }
 static void Win32PaintBackBuffer(HDC DeviceContext, win32_back_buffer *BackBuffer)
 {
