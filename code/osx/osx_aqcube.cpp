@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <dlfcn.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 
 #include "../aqcube_platform.h" // TODO(joe): I'm not sure if I like that this is needed.
@@ -85,6 +86,35 @@ static float OSX_GetElapsedSeconds(uint64 Start, uint64 End)
     return Result;
 }
 
+struct game_code
+{
+    void *Handle;
+    int WriteTime;
+
+    update_game_and_render *UpdateGameAndRender;
+
+    bool IsValid;
+};
+
+static game_code OSX_LoadGameCode(const char *GameFileName)
+{
+    game_code Result = {};
+
+    Result.Handle = dlopen(GameFileName, RTLD_NOW | RTLD_LOCAL);
+    if (Result.Handle)
+    {
+        struct stat GameFileData = {};
+        stat(GameFileName, &GameFileData);
+        Result.WriteTime = GameFileData.st_mtimespec.tv_sec;
+
+        Result.UpdateGameAndRender = (update_game_and_render *)dlsym(Result.Handle, "UpdateGameAndRender");
+
+        Result.IsValid = (Result.UpdateGameAndRender != 0);
+    }
+
+    return Result;
+}
+
 int main(int argc, char** argv)
 {
     if (SDL_Init(SDL_INIT_VIDEO) < 0)
@@ -105,6 +135,9 @@ int main(int argc, char** argv)
         SDL_Surface *Surface = SDL_GetWindowSurface(Window);
         if (Surface)
         {
+            char GameFileName[] = "./libaqcube.so";
+            game_code Game = OSX_LoadGameCode(GameFileName);
+
             game_memory Memory = {};
             Memory.PermanentStorageSize = Megabytes(64);
             Memory.PermanentStorage = mmap(0, Memory.PermanentStorageSize, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
@@ -113,78 +146,69 @@ int main(int argc, char** argv)
 
             if (Memory.PermanentStorage && Memory.TransientStorage)
             {
-                update_game_and_render *UpdateGameAndRender = 0;
 
-                void *GameCodeHandle = dlopen("./libaqcube.so", RTLD_NOW | RTLD_LOCAL);
-                if (GameCodeHandle)
+                if (Game.IsValid)
                 {
-                    UpdateGameAndRender = (update_game_and_render *)dlsym(GameCodeHandle, "UpdateGameAndRender");
-                    char *LoadSymError = dlerror();
-                    if (!UpdateGameAndRender || LoadSymError)
+                    game_back_buffer BackBuffer = {};
+                    BackBuffer.Memory = Surface->pixels;
+                    BackBuffer.Width = Surface->w;;
+                    BackBuffer.Height = Surface->h;;
+                    BackBuffer.Pitch = Surface->pitch;
+                    BackBuffer.BytesPerPixel = Surface->format->BytesPerPixel;
+
+                    int MonitorHz = 60;
+                    int GameUpdateHz = MonitorHz / 2;
+                    float TargetFrameSeconds = 1.0f / (float)GameUpdateHz;
+
+                    game_controller_input Input = {};
+
+                    uint64 LastFrameCount = SDL_GetPerformanceCounter();
+                    while (GlobalRunning)
                     {
-                        printf("Unable to get update func: %s\n", LoadSymError);
+                        OSX_ProcessInput(&Input);
+                        Input.dt = TargetFrameSeconds;
+
+                        if (Game.UpdateGameAndRender)
+                        {
+                            Game.UpdateGameAndRender(&Memory, &BackBuffer, &Input);
+                        }
+
+                        uint64 FrameCount = SDL_GetPerformanceCounter();
+                        float ElapsedTime = OSX_GetElapsedSeconds(LastFrameCount, FrameCount);
+                        if (ElapsedTime < TargetFrameSeconds)
+                        {
+                            uint32 TimeToSleep = (uint32)(1000.0f * (TargetFrameSeconds - ElapsedTime));
+                            if (TimeToSleep > 0)
+                            {
+                                SDL_Delay(TimeToSleep);
+                            }
+
+                            ElapsedTime = OSX_GetElapsedSeconds(LastFrameCount, SDL_GetPerformanceCounter());
+                            while (ElapsedTime < TargetFrameSeconds)
+                            {
+                                ElapsedTime = OSX_GetElapsedSeconds(LastFrameCount, SDL_GetPerformanceCounter());
+                            }
+                        }
+                        else
+                        {
+                            // TODO(joe): Log that we missed a frame.
+                        }
+
+
+                        uint64 EndCount = SDL_GetPerformanceCounter();
+#if 0
+                        float MSPerFrame = 1000.0f * OSX_GetElapsedSeconds(LastFrameCount, EndCount);
+                        float FPS = 1000.0f / MSPerFrame;
+                        printf("ms/f: %.2f f/s: %.2f \n", MSPerFrame, FPS);
+#endif
+                        LastFrameCount = EndCount;
+
+                        SDL_UpdateWindowSurface(Window);
                     }
                 }
                 else
                 {
-                    printf("Unable to load the game.\n");
-                }
-
-                game_back_buffer BackBuffer = {};
-                BackBuffer.Memory = Surface->pixels;
-                BackBuffer.Width = Surface->w;;
-                BackBuffer.Height = Surface->h;;
-                BackBuffer.Pitch = Surface->pitch;
-                BackBuffer.BytesPerPixel = Surface->format->BytesPerPixel;
-
-                int MonitorHz = 60;
-                int GameUpdateHz = MonitorHz / 2;
-                float TargetFrameSeconds = 1.0f / (float)GameUpdateHz;
-
-                game_controller_input Input = {};
-
-                uint64 LastFrameCount = SDL_GetPerformanceCounter();
-                while (GlobalRunning)
-                {
-                    OSX_ProcessInput(&Input);
-                    Input.dt = TargetFrameSeconds;
-
-                    if (UpdateGameAndRender)
-                    {
-                        UpdateGameAndRender(&Memory, &BackBuffer, &Input);
-                    }
-
-                    uint64 FrameCount = SDL_GetPerformanceCounter();
-                    float ElapsedTime = OSX_GetElapsedSeconds(LastFrameCount, FrameCount);
-                    if (ElapsedTime < TargetFrameSeconds)
-                    {
-                        uint32 TimeToSleep = (uint32)(1000.0f * (TargetFrameSeconds - ElapsedTime));
-                        if (TimeToSleep > 0)
-                        {
-                            SDL_Delay(TimeToSleep);
-                        }
-
-                        ElapsedTime = OSX_GetElapsedSeconds(LastFrameCount, SDL_GetPerformanceCounter());
-                        while (ElapsedTime < TargetFrameSeconds)
-                        {
-                            ElapsedTime = OSX_GetElapsedSeconds(LastFrameCount, SDL_GetPerformanceCounter());
-                        }
-                    }
-                    else
-                    {
-                        // TODO(joe): Log that we missed a frame.
-                    }
-
-
-                    uint64 EndCount = SDL_GetPerformanceCounter();
-#if 0
-                    float MSPerFrame = 1000.0f * OSX_GetElapsedSeconds(LastFrameCount, EndCount);
-                    float FPS = 1000.0f / MSPerFrame;
-                    printf("ms/f: %.2f f/s: %.2f \n", MSPerFrame, FPS);
-#endif
-                    LastFrameCount = EndCount;
-
-                    SDL_UpdateWindowSurface(Window);
+                    printf("Unable to load game code.\n");
                 }
             }
         }
