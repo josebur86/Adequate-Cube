@@ -1,8 +1,8 @@
 #include "SDL2/SDL.h"
 
 #include <assert.h>
-#include <stdio.h>
 #include <dlfcn.h>
+#include <stdio.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -23,58 +23,61 @@ static void OSX_ProcessInput(game_controller_input *Input)
     SDL_Event Event;
     while (SDL_PollEvent(&Event))
     {
-        switch(Event.type)
+        switch (Event.type)
         {
-            case SDL_QUIT:
+        case SDL_QUIT:
+        {
+            GlobalRunning = false;
+        }
+        break;
+        case SDL_KEYDOWN:
+        {
+            if (!Event.key.repeat)
             {
-                GlobalRunning = false;
-            } break;
-            case SDL_KEYDOWN:
-            {
-                if (!Event.key.repeat)
+                SDL_Keycode KeyCode = Event.key.keysym.sym;
+                if (KeyCode == SDLK_w)
                 {
-                    SDL_Keycode KeyCode = Event.key.keysym.sym;
-                    if (KeyCode == SDLK_w)
-                    {
-                        OSX_ProcessButtonState(&Input->Up, true);
-                    }
-                    else if (KeyCode == SDLK_s)
-                    {
-                        OSX_ProcessButtonState(&Input->Down, true);
-                    }
-                    else if (KeyCode == SDLK_a)
-                    {
-                        OSX_ProcessButtonState(&Input->Left, true);
-                    }
-                    else if (KeyCode == SDLK_d)
-                    {
-                        OSX_ProcessButtonState(&Input->Right, true);
-                    }
+                    OSX_ProcessButtonState(&Input->Up, true);
                 }
-            } break;
-            case SDL_KEYUP:
-            {
-                if (!Event.key.repeat)
+                else if (KeyCode == SDLK_s)
                 {
-                    SDL_Keycode KeyCode = Event.key.keysym.sym;
-                    if (KeyCode == SDLK_w)
-                    {
-                        OSX_ProcessButtonState(&Input->Up, false);
-                    }
-                    else if (KeyCode == SDLK_s)
-                    {
-                        OSX_ProcessButtonState(&Input->Down, false);
-                    }
-                    else if (KeyCode == SDLK_a)
-                    {
-                        OSX_ProcessButtonState(&Input->Left, false);
-                    }
-                    else if (KeyCode == SDLK_d)
-                    {
-                        OSX_ProcessButtonState(&Input->Right, false);
-                    }
+                    OSX_ProcessButtonState(&Input->Down, true);
                 }
-            } break;
+                else if (KeyCode == SDLK_a)
+                {
+                    OSX_ProcessButtonState(&Input->Left, true);
+                }
+                else if (KeyCode == SDLK_d)
+                {
+                    OSX_ProcessButtonState(&Input->Right, true);
+                }
+            }
+        }
+        break;
+        case SDL_KEYUP:
+        {
+            if (!Event.key.repeat)
+            {
+                SDL_Keycode KeyCode = Event.key.keysym.sym;
+                if (KeyCode == SDLK_w)
+                {
+                    OSX_ProcessButtonState(&Input->Up, false);
+                }
+                else if (KeyCode == SDLK_s)
+                {
+                    OSX_ProcessButtonState(&Input->Down, false);
+                }
+                else if (KeyCode == SDLK_a)
+                {
+                    OSX_ProcessButtonState(&Input->Left, false);
+                }
+                else if (KeyCode == SDLK_d)
+                {
+                    OSX_ProcessButtonState(&Input->Right, false);
+                }
+            }
+        }
+        break;
         }
     }
 }
@@ -114,7 +117,7 @@ static game_code OSX_LoadGameCode(const char *GameFileName)
     Result.Handle = dlopen(GameFileName, RTLD_NOW | RTLD_LOCAL);
     if (Result.Handle)
     {
-        Result.WriteTime = OSX_GetLastWriteTime(GameFileName);
+        Result.WriteTime           = OSX_GetLastWriteTime(GameFileName);
         Result.UpdateGameAndRender = (update_game_and_render *)dlsym(Result.Handle, "UpdateGameAndRender");
 
         Result.IsValid = (Result.UpdateGameAndRender != 0);
@@ -130,12 +133,12 @@ static void OSX_FreeGameCode(game_code *Game)
         dlclose(Game->Handle);
     }
 
-    Game->Handle = 0;
+    Game->Handle              = 0;
     Game->UpdateGameAndRender = 0;
-    Game->IsValid = false;
+    Game->IsValid             = false;
 }
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
     if (SDL_Init(SDL_INIT_VIDEO) < 0)
     {
@@ -156,25 +159,25 @@ int main(int argc, char** argv)
         if (Surface)
         {
             char GameFileName[] = "./libaqcube.so";
-            game_code Game = OSX_LoadGameCode(GameFileName);
+            game_code Game      = OSX_LoadGameCode(GameFileName);
 
-            game_memory Memory = {};
+            game_memory Memory          = {};
             Memory.PermanentStorageSize = Megabytes(64);
-            Memory.PermanentStorage = mmap(0, Memory.PermanentStorageSize, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+            Memory.PermanentStorage     = mmap(0, Memory.PermanentStorageSize, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
             Memory.TransientStorageSize = Gigabytes((uint64)4);
-            Memory.TransientStorage = mmap(0, Memory.TransientStorageSize, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+            Memory.TransientStorage     = mmap(0, Memory.TransientStorageSize, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
 
             if (Memory.PermanentStorage && Memory.TransientStorage)
             {
                 game_back_buffer BackBuffer = {};
-                BackBuffer.Memory = Surface->pixels;
-                BackBuffer.Width = Surface->w;;
-                BackBuffer.Height = Surface->h;;
-                BackBuffer.Pitch = Surface->pitch;
-                BackBuffer.BytesPerPixel = Surface->format->BytesPerPixel;
+                BackBuffer.Memory           = Surface->pixels;
+                BackBuffer.Width            = Surface->w;
+                BackBuffer.Height           = Surface->h;
+                BackBuffer.Pitch            = Surface->pitch;
+                BackBuffer.BytesPerPixel    = Surface->format->BytesPerPixel;
 
-                int MonitorHz = 60;
-                int GameUpdateHz = MonitorHz / 2;
+                int MonitorHz            = 60;
+                int GameUpdateHz         = MonitorHz / 2;
                 float TargetFrameSeconds = 1.0f / (float)GameUpdateHz;
 
                 game_controller_input Input = {};
