@@ -96,6 +96,17 @@ struct game_code
     bool IsValid;
 };
 
+static int OSX_GetLastWriteTime(const char *FileName)
+{
+    int Result = 0;
+
+    struct stat FileData = {};
+    stat(FileName, &FileData);
+    Result = FileData.st_mtimespec.tv_sec;
+
+    return Result;
+}
+
 static game_code OSX_LoadGameCode(const char *GameFileName)
 {
     game_code Result = {};
@@ -103,16 +114,25 @@ static game_code OSX_LoadGameCode(const char *GameFileName)
     Result.Handle = dlopen(GameFileName, RTLD_NOW | RTLD_LOCAL);
     if (Result.Handle)
     {
-        struct stat GameFileData = {};
-        stat(GameFileName, &GameFileData);
-        Result.WriteTime = GameFileData.st_mtimespec.tv_sec;
-
+        Result.WriteTime = OSX_GetLastWriteTime(GameFileName);
         Result.UpdateGameAndRender = (update_game_and_render *)dlsym(Result.Handle, "UpdateGameAndRender");
 
         Result.IsValid = (Result.UpdateGameAndRender != 0);
     }
 
     return Result;
+}
+
+static void OSX_FreeGameCode(game_code *Game)
+{
+    if (Game->Handle)
+    {
+        dlclose(Game->Handle);
+    }
+
+    Game->Handle = 0;
+    Game->UpdateGameAndRender = 0;
+    Game->IsValid = false;
 }
 
 int main(int argc, char** argv)
@@ -146,69 +166,67 @@ int main(int argc, char** argv)
 
             if (Memory.PermanentStorage && Memory.TransientStorage)
             {
+                game_back_buffer BackBuffer = {};
+                BackBuffer.Memory = Surface->pixels;
+                BackBuffer.Width = Surface->w;;
+                BackBuffer.Height = Surface->h;;
+                BackBuffer.Pitch = Surface->pitch;
+                BackBuffer.BytesPerPixel = Surface->format->BytesPerPixel;
 
-                if (Game.IsValid)
+                int MonitorHz = 60;
+                int GameUpdateHz = MonitorHz / 2;
+                float TargetFrameSeconds = 1.0f / (float)GameUpdateHz;
+
+                game_controller_input Input = {};
+
+                uint64 LastFrameCount = SDL_GetPerformanceCounter();
+                while (GlobalRunning)
                 {
-                    game_back_buffer BackBuffer = {};
-                    BackBuffer.Memory = Surface->pixels;
-                    BackBuffer.Width = Surface->w;;
-                    BackBuffer.Height = Surface->h;;
-                    BackBuffer.Pitch = Surface->pitch;
-                    BackBuffer.BytesPerPixel = Surface->format->BytesPerPixel;
-
-                    int MonitorHz = 60;
-                    int GameUpdateHz = MonitorHz / 2;
-                    float TargetFrameSeconds = 1.0f / (float)GameUpdateHz;
-
-                    game_controller_input Input = {};
-
-                    uint64 LastFrameCount = SDL_GetPerformanceCounter();
-                    while (GlobalRunning)
+                    if (Game.WriteTime != OSX_GetLastWriteTime(GameFileName))
                     {
-                        OSX_ProcessInput(&Input);
-                        Input.dt = TargetFrameSeconds;
-
-                        if (Game.UpdateGameAndRender)
-                        {
-                            Game.UpdateGameAndRender(&Memory, &BackBuffer, &Input);
-                        }
-
-                        uint64 FrameCount = SDL_GetPerformanceCounter();
-                        float ElapsedTime = OSX_GetElapsedSeconds(LastFrameCount, FrameCount);
-                        if (ElapsedTime < TargetFrameSeconds)
-                        {
-                            uint32 TimeToSleep = (uint32)(1000.0f * (TargetFrameSeconds - ElapsedTime));
-                            if (TimeToSleep > 0)
-                            {
-                                SDL_Delay(TimeToSleep);
-                            }
-
-                            ElapsedTime = OSX_GetElapsedSeconds(LastFrameCount, SDL_GetPerformanceCounter());
-                            while (ElapsedTime < TargetFrameSeconds)
-                            {
-                                ElapsedTime = OSX_GetElapsedSeconds(LastFrameCount, SDL_GetPerformanceCounter());
-                            }
-                        }
-                        else
-                        {
-                            // TODO(joe): Log that we missed a frame.
-                        }
-
-
-                        uint64 EndCount = SDL_GetPerformanceCounter();
-#if 0
-                        float MSPerFrame = 1000.0f * OSX_GetElapsedSeconds(LastFrameCount, EndCount);
-                        float FPS = 1000.0f / MSPerFrame;
-                        printf("ms/f: %.2f f/s: %.2f \n", MSPerFrame, FPS);
-#endif
-                        LastFrameCount = EndCount;
-
-                        SDL_UpdateWindowSurface(Window);
+                        OSX_FreeGameCode(&Game);
+                        Game = OSX_LoadGameCode(GameFileName);
                     }
-                }
-                else
-                {
-                    printf("Unable to load game code.\n");
+                    assert(Game.IsValid);
+
+                    OSX_ProcessInput(&Input);
+                    Input.dt = TargetFrameSeconds;
+
+                    if (Game.UpdateGameAndRender)
+                    {
+                        Game.UpdateGameAndRender(&Memory, &BackBuffer, &Input);
+                    }
+
+                    uint64 FrameCount = SDL_GetPerformanceCounter();
+                    float ElapsedTime = OSX_GetElapsedSeconds(LastFrameCount, FrameCount);
+                    if (ElapsedTime < TargetFrameSeconds)
+                    {
+                        uint32 TimeToSleep = (uint32)(1000.0f * (TargetFrameSeconds - ElapsedTime));
+                        if (TimeToSleep > 0)
+                        {
+                            SDL_Delay(TimeToSleep);
+                        }
+
+                        ElapsedTime = OSX_GetElapsedSeconds(LastFrameCount, SDL_GetPerformanceCounter());
+                        while (ElapsedTime < TargetFrameSeconds)
+                        {
+                            ElapsedTime = OSX_GetElapsedSeconds(LastFrameCount, SDL_GetPerformanceCounter());
+                        }
+                    }
+                    else
+                    {
+                        // TODO(joe): Log that we missed a frame.
+                    }
+
+                    uint64 EndCount = SDL_GetPerformanceCounter();
+#if 0
+                    float MSPerFrame = 1000.0f * OSX_GetElapsedSeconds(LastFrameCount, EndCount);
+                    float FPS = 1000.0f / MSPerFrame;
+                    printf("ms/f: %.2f f/s: %.2f \n", MSPerFrame, FPS);
+#endif
+                    LastFrameCount = EndCount;
+
+                    SDL_UpdateWindowSurface(Window);
                 }
             }
         }
