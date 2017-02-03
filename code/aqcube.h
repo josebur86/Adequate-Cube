@@ -2,6 +2,18 @@
 
 /*
  * TODO(joe):
+ *  - Scrolling background
+ *  - Up/down sprites
+ *
+ *  - Power-Ups
+ *      * Thing that follows your movements but can also shoot (familiar).
+ *  - Enemies
+ *      * Enter from both sides of the screen.
+ *      * Can be on the ground
+ */
+
+/*
+ * TODO(joe):
  *  - I haven't decided how I want to break up the different layers yet.  I
  *    don't really like the C style of prefixing every function name with the
  *    layer that it belongs to (e.g. PlaformReadFile). I kind of prefer moving

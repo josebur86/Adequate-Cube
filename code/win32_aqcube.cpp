@@ -1,3 +1,6 @@
+#define DIRECTINPUT_VERSION 0x0800
+#define INITGUID 1
+#include <dinput.h>
 #include <dsound.h>
 #include <windows.h>
 
@@ -5,6 +8,50 @@
 #include <stdio.h>
 
 #include "aqcube_platform.h"
+
+//
+// DirectInput
+//
+typedef HRESULT direct_input_8_create(HINSTANCE hinst, DWORD dwVersion, REFIID riidltf, LPVOID *ppvOut,
+                                      LPUNKNOWN punkOuter);
+direct_input_8_create *GlobalDirectInput8Create;
+
+static void Win32LoadDirectInput()
+{
+    char DirectInputDLL[]  = "dinput8.dll"; // TODO(joe): dinput.dll?
+    HMODULE DirectInputLib = LoadLibraryA(DirectInputDLL);
+    if (DirectInputLib)
+    {
+        GlobalDirectInput8Create = (direct_input_8_create *)GetProcAddress(DirectInputLib, "DirectInput8Create");
+    }
+}
+
+struct EnumDeviceResult
+{
+    bool DeviceFound;
+    GUID DeviceGuid;
+};
+
+// NOTE(joe): This is what my computer is reporting the PlayStation 4 DualShock controller as.
+// What about other controllers?
+#define PS4_DEVICE ((DIDEVTYPE_HID) | (DI8DEVTYPE_1STPERSON) | (DI8DEVTYPE1STPERSON_SIXDOF << 8))
+
+BOOL Win32DirectInputEnumDeviceCallback(LPCDIDEVICEINSTANCE DeviceInstance, LPVOID AppValue)
+{
+    if (DeviceInstance->dwDevType == PS4_DEVICE)
+    {
+        OutputDebugStringA("PlayStation 4 Constroller Found!\n");
+
+        EnumDeviceResult *Result = (EnumDeviceResult *)AppValue;
+        Result->DeviceFound = true;
+        Result->DeviceGuid = DeviceInstance->guidInstance;
+
+        // TODO(joe): Should we really stop? What about multiplayer?
+        return DIENUM_STOP;
+    }
+
+    return DIENUM_CONTINUE;
+}
 
 struct win32_back_buffer
 {
@@ -420,6 +467,25 @@ static void Win32ProcessPendingMessages(game_controller_input *Input)
 
 int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLine, int ShowCode)
 {
+    Win32LoadDirectInput();
+
+    IDirectInput8 *DirectInput;
+    HRESULT Result
+        = GlobalDirectInput8Create(Instance, DIRECTINPUT_VERSION, IID_IDirectInput8A, (LPVOID *)&DirectInput, 0);
+    if (Result == DI_OK)
+    {
+        EnumDeviceResult DeviceResult = {};
+        Result = DirectInput->EnumDevices(DI8DEVCLASS_GAMECTRL, Win32DirectInputEnumDeviceCallback, &DeviceResult,
+                                          DIEDFL_ALLDEVICES | DIEDFL_ATTACHEDONLY);
+        assert(Result == DI_OK);
+        if (DeviceResult.DeviceFound)
+        {
+            IDirectInputDevice8 *Device;
+            Result = DirectInput->CreateDevice(DeviceResult.DeviceGuid, &Device, 0);
+            assert(Result == DI_OK);
+        }
+    }
+
     WNDCLASSA WindowClass     = {};
     WindowClass.style         = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
     WindowClass.lpfnWndProc   = Win32MainCallWindowCallback;
@@ -443,9 +509,9 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
             Memory.TransientStorage
                 = VirtualAlloc(0, Memory.TransientStorageSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 
-            char *GameDLLFileName     = "aqcube.dll";
-            char *GameTempDLLFileName = "aqcube_temp.dll";
-            char *GameLockFile        = "lock.tmp";
+            char GameDLLFileName[]     = "aqcube.dll";
+            char GameTempDLLFileName[] = "aqcube_temp.dll";
+            char GameLockFile[]        = "lock.tmp";
 
             if (Memory.PermanentStorage && Memory.TransientStorage)
             {
@@ -605,7 +671,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
 
                         LARGE_INTEGER EndCount = Win32GetClock();
 
-#if 1
+#if 0
                         char FrameTimeString[255];
                         float MSPerFrame = 1000.0f * Win32GetElapsedSeconds(LastFrameCount, EndCount);
                         float FPS        = 1000.0f / MSPerFrame;
