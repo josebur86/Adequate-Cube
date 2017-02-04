@@ -12,10 +12,59 @@
 uint64 GlobalTimerFreq;
 bool GlobalRunning = true;
 
+///
+/// Controller Input
+///
+
+static SDL_GameController *OSX_InitController()
+{
+    SDL_GameController *Result;
+    printf("Controllers...\n");
+    for (int ControllerIndex = 0; ControllerIndex < SDL_NumJoysticks(); ++ControllerIndex)
+    {
+        if (SDL_IsGameController(ControllerIndex))
+        {
+            printf("%s\n", SDL_GameControllerNameForIndex(ControllerIndex));
+            Result = SDL_GameControllerOpen(ControllerIndex);
+            assert(Result);
+            break;
+        }
+    }
+
+    return Result;
+}
+
 static void OSX_ProcessButtonState(button_state *Button, bool IsDown)
 {
     assert(Button->IsDown != IsDown);
     Button->IsDown = IsDown;
+}
+
+static void OSX_ProcessGameController(SDL_GameController *Controller, game_controller_input *Input)
+{
+    bool IsDown = (SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_UP) == 1);
+    if (Input->Up.IsDown != IsDown)
+    {
+        OSX_ProcessButtonState(&Input->Up, IsDown);
+    }
+
+    IsDown = (SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN) == 1);
+    if (Input->Down.IsDown != IsDown)
+    {
+        OSX_ProcessButtonState(&Input->Down, IsDown);
+    }
+
+    IsDown = (SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT) == 1);
+    if (Input->Left.IsDown != IsDown)
+    {
+        OSX_ProcessButtonState(&Input->Left, IsDown);
+    }
+
+    IsDown = (SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT) == 1);
+    if (Input->Right.IsDown != IsDown)
+    {
+        OSX_ProcessButtonState(&Input->Right, IsDown);
+    }
 }
 
 static void OSX_ProcessInput(game_controller_input *Input)
@@ -30,6 +79,7 @@ static void OSX_ProcessInput(game_controller_input *Input)
             GlobalRunning = false;
         }
         break;
+#if 0
         case SDL_KEYDOWN:
         {
             if (!Event.key.repeat)
@@ -78,6 +128,7 @@ static void OSX_ProcessInput(game_controller_input *Input)
             }
         }
         break;
+#endif
         }
     }
 }
@@ -140,19 +191,18 @@ static void OSX_FreeGameCode(game_code *Game)
 
 int main(int argc, char **argv)
 {
-    if (SDL_Init(SDL_INIT_VIDEO) < 0)
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) < 0)
     {
         printf("Unable to initialize SDL!\n");
         return 1;
     }
 
+    SDL_GameController *Controller = OSX_InitController();
+
     GlobalTimerFreq = SDL_GetPerformanceFrequency();
 
-    SDL_Window *Window = SDL_CreateWindow("Adequate Cube",
-                                          SDL_WINDOWPOS_UNDEFINED,
-                                          SDL_WINDOWPOS_UNDEFINED,
-                                          800, 600,
-                                          0);
+    SDL_Window *Window
+        = SDL_CreateWindow("Adequate Cube", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 800, 600, 0);
     if (Window)
     {
         SDL_Surface *Surface = SDL_GetWindowSurface(Window);
@@ -163,9 +213,11 @@ int main(int argc, char **argv)
 
             game_memory Memory          = {};
             Memory.PermanentStorageSize = Megabytes(64);
-            Memory.PermanentStorage     = mmap(0, Memory.PermanentStorageSize, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+            Memory.PermanentStorage
+                = mmap(0, Memory.PermanentStorageSize, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
             Memory.TransientStorageSize = Gigabytes((uint64)4);
-            Memory.TransientStorage     = mmap(0, Memory.TransientStorageSize, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+            Memory.TransientStorage
+                = mmap(0, Memory.TransientStorageSize, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
 
             if (Memory.PermanentStorage && Memory.TransientStorage)
             {
@@ -193,6 +245,8 @@ int main(int argc, char **argv)
                     assert(Game.IsValid);
 
                     OSX_ProcessInput(&Input);
+                    OSX_ProcessGameController(Controller, &Input);
+
                     Input.dt = TargetFrameSeconds;
 
                     if (Game.UpdateGameAndRender)
