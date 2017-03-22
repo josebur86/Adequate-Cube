@@ -40,7 +40,7 @@ BOOL Win32DirectInputEnumDeviceCallback(LPCDIDEVICEINSTANCE DeviceInstance, LPVO
 {
     if (DeviceInstance->dwDevType == PS4_DEVICE)
     {
-        OutputDebugStringA("PlayStation 4 Constroller Found!\n");
+        OutputDebugStringA("PlayStation 4 Controller Found!\n");
 
         EnumDeviceResult *Result = (EnumDeviceResult *)AppValue;
         Result->DeviceFound = true;

@@ -17,6 +17,14 @@ typedef uint16_t uint16;
 typedef uint32_t uint32;
 typedef uint64_t uint64;
 
+typedef float r32;
+
+typedef int32_t s32;
+typedef uint32_t u32;
+
+typedef int64_t s64;
+typedef uint64_t u64;
+
 // TODO(joe): This constant should move into the math specific files.
 #define PI32 3.14159265359f
 
