@@ -81,11 +81,14 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
     {
         ddP.X = -1.0f;
     }
-    float ShipSpeed = 1000.0f; // pixels / sec^2
-    ddP             = ddP * ShipSpeed; // TODO(joe): Overload *= for vectors
-    ddP             = -2.0f * Ship->dP + ddP;
+    if ((Input->Down.IsDown || Input->Up.IsDown) && (Input->Right.IsDown || Input->Left.IsDown))
+    {
+        ddP = ddP * 0.707f;
+    }
 
-    // TODO(joe): I think there is a diagonal motion issue.
+    float ShipSpeed = 2000.0f; // pixels / sec^2
+    ddP             = ddP * ShipSpeed; // TODO(joe): Overload *= for vectors
+    ddP             = -5.0f * Ship->dP + ddP;
 
     Ship->P  = (0.5f * ddP * Square(Input->dt)) + (Ship->dP * Input->dt) + Ship->P;
     Ship->dP = (ddP * Input->dt) + Ship->dP;
