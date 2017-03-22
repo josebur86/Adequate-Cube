@@ -8,6 +8,7 @@
 #include <stdio.h>
 
 #include "aqcube_platform.h"
+#include "aqcube_math.h"
 
 //
 // DirectInput
@@ -18,7 +19,7 @@ direct_input_8_create *GlobalDirectInput8Create;
 
 static void Win32LoadDirectInput()
 {
-    char DirectInputDLL[]  = "dinput8.dll"; // TODO(joe): dinput.dll?
+    char DirectInputDLL[] = "dinput8.dll"; // TODO(joe): dinput.dll?
     HMODULE DirectInputLib = LoadLibraryA(DirectInputDLL);
     if (DirectInputLib)
     {
@@ -86,7 +87,7 @@ read_file_result DEBUGWin32ReadFile(char *Filename)
         if (GetFileSizeEx(FileHandle, &FileSize))
         {
             DWORD FileSize32 = (DWORD)FileSize.QuadPart; // TODO(joe): Safe truncation?
-            Result.Contents  = VirtualAlloc(0, FileSize32, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+            Result.Contents = VirtualAlloc(0, FileSize32, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
             if (Result.Contents)
             {
                 DWORD BytesRead = 0;
@@ -110,7 +111,7 @@ read_file_result DEBUGWin32ReadFile(char *Filename)
 
 bool DEBUGWin32WriteFile(char *Filename, void *Memory, uint32 FileSize)
 {
-    bool Result       = false;
+    bool Result = false;
     HANDLE FileHandle = CreateFileA(Filename, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
     if (FileHandle)
     {
@@ -141,7 +142,16 @@ static win32_back_buffer GlobalBackBuffer;
 static LPDIRECTSOUNDBUFFER GlobalSecondaryBuffer;
 static LARGE_INTEGER GlobalPerfFrequencyCount;
 
-static void Win32ResizeBackBuffer(win32_back_buffer *Buffer, int Width, int Height)
+static vector2 Win32GetWindowSize(HWND Window)
+{
+    RECT Rect;
+    GetClientRect(Window, &Rect);
+
+    vector2 Result = V2(Rect.right - Rect.left, Rect.bottom - Rect.top);
+    return Result;
+}
+
+static void Win32ResizeBackBuffer(win32_back_buffer *Buffer, vector2 ClientSize)
 {
     // TODO(joe): There is some concern that the VirtualAlloc could fail which
     // would leave us without a buffer. See if there's a better way to handle
@@ -151,27 +161,27 @@ static void Win32ResizeBackBuffer(win32_back_buffer *Buffer, int Width, int Heig
         VirtualFree(Buffer->Memory, 0, MEM_RELEASE);
     }
 
-    Buffer->Width  = Width;
-    Buffer->Height = Height;
+    Buffer->Width = (s32)ClientSize.X;
+    Buffer->Height = (s32)ClientSize.Y;
 
     Buffer->BytesPerPixel = 4;
 
-    Buffer->Info.bmiHeader.biSize   = sizeof(Buffer->Info.bmiHeader);
-    Buffer->Info.bmiHeader.biWidth  = Buffer->Width;
+    Buffer->Info.bmiHeader.biSize = sizeof(Buffer->Info.bmiHeader);
+    Buffer->Info.bmiHeader.biWidth = Buffer->Width;
     Buffer->Info.bmiHeader.biHeight = Buffer->Height;
     // TODO(joe): Treat the buffer as top-down for now. It might be better to
     // treat the back buffer as bottom up in the future.
-    Buffer->Info.bmiHeader.biHeight   = -Buffer->Height;
-    Buffer->Info.bmiHeader.biPlanes   = 1;
+    Buffer->Info.bmiHeader.biHeight = -Buffer->Height;
+    Buffer->Info.bmiHeader.biPlanes = 1;
     Buffer->Info.bmiHeader.biBitCount = 32;
 
     // Uncompressed: The value for blue is in the least significant 8
     // bits, followed by 8 bits each for green and red.
     // BB GG RR XX
     Buffer->Info.bmiHeader.biCompression = BI_RGB;
-    Buffer->Pitch                        = Buffer->Width * Buffer->BytesPerPixel;
-    int BufferMemorySize                 = Buffer->Height * Buffer->Width * Buffer->BytesPerPixel;
-    Buffer->Memory                       = VirtualAlloc(0, BufferMemorySize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    Buffer->Pitch = Buffer->Width * Buffer->BytesPerPixel;
+    int BufferMemorySize = Buffer->Height * Buffer->Width * Buffer->BytesPerPixel;
+    Buffer->Memory = VirtualAlloc(0, BufferMemorySize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 }
 static void Win32PaintBackBuffer(HDC DeviceContext, win32_back_buffer *BackBuffer)
 {
@@ -184,11 +194,38 @@ static void Win32PaintBackBuffer(HDC DeviceContext, win32_back_buffer *BackBuffe
                   BackBuffer->Memory, &BackBuffer->Info, DIB_RGB_COLORS, SRCCOPY);
 }
 
+static WINDOWPLACEMENT GlobalLastWindowPlacement;
+
+static void Win32ToggleFullScreen(HWND Window)
+{
+    DWORD dwStyle = GetWindowLong(Window, GWL_STYLE);
+    if (dwStyle & WS_OVERLAPPEDWINDOW)
+    {
+        MONITORINFO MonitorInfo = { sizeof(MonitorInfo) };
+        if (GetWindowPlacement(Window, &GlobalLastWindowPlacement)
+            && GetMonitorInfo(MonitorFromWindow(Window, MONITOR_DEFAULTTOPRIMARY), &MonitorInfo))
+        {
+            SetWindowLong(Window, GWL_STYLE, dwStyle & ~WS_OVERLAPPEDWINDOW);
+            SetWindowPos(Window, HWND_TOP, MonitorInfo.rcMonitor.left, MonitorInfo.rcMonitor.top,
+                         MonitorInfo.rcMonitor.right - MonitorInfo.rcMonitor.left,
+                         MonitorInfo.rcMonitor.bottom - MonitorInfo.rcMonitor.top,
+                         SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+        }
+    }
+    else
+    {
+        SetWindowLong(Window, GWL_STYLE, dwStyle | WS_OVERLAPPEDWINDOW);
+        SetWindowPlacement(Window, &GlobalLastWindowPlacement);
+        SetWindowPos(Window, NULL, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+    }
+}
+
 static void InitSound(HWND Window, DWORD SamplesPerSec, DWORD BufferSize)
 {
-    WORD Channels        = 2;
-    WORD BitsPerSample   = 16;
-    WORD BlockAlign      = Channels * (BitsPerSample / 8);
+    WORD Channels = 2;
+    WORD BitsPerSample = 16;
+    WORD BlockAlign = Channels * (BitsPerSample / 8);
     DWORD AvgBytesPerSec = SamplesPerSec * BlockAlign;
 
     // Create the primary buffer
@@ -199,29 +236,29 @@ static void InitSound(HWND Window, DWORD SamplesPerSec, DWORD BufferSize)
         if (DirectSound->SetCooperativeLevel(Window, DSSCL_PRIORITY) == DS_OK)
         {
             DSBUFFERDESC PrimaryBufferDescription = {};
-            PrimaryBufferDescription.dwSize       = sizeof(PrimaryBufferDescription);
-            PrimaryBufferDescription.dwFlags      = DSBCAPS_PRIMARYBUFFER;
+            PrimaryBufferDescription.dwSize = sizeof(PrimaryBufferDescription);
+            PrimaryBufferDescription.dwFlags = DSBCAPS_PRIMARYBUFFER;
 
             LPDIRECTSOUNDBUFFER PrimaryBuffer;
             if (DirectSound->CreateSoundBuffer(&PrimaryBufferDescription, &PrimaryBuffer, 0) == DS_OK)
             {
                 OutputDebugStringA("Created the primary buffer.\n");
 
-                WAVEFORMATEX Format    = {};
-                Format.wFormatTag      = WAVE_FORMAT_PCM;
-                Format.nChannels       = Channels;
-                Format.wBitsPerSample  = BitsPerSample;
-                Format.nSamplesPerSec  = SamplesPerSec;
-                Format.nBlockAlign     = BlockAlign;
+                WAVEFORMATEX Format = {};
+                Format.wFormatTag = WAVE_FORMAT_PCM;
+                Format.nChannels = Channels;
+                Format.wBitsPerSample = BitsPerSample;
+                Format.nSamplesPerSec = SamplesPerSec;
+                Format.nBlockAlign = BlockAlign;
                 Format.nAvgBytesPerSec = AvgBytesPerSec;
 
                 PrimaryBuffer->SetFormat(&Format);
 
                 DSBUFFERDESC SecondaryBufferDescription = {};
-                SecondaryBufferDescription.dwSize       = sizeof(SecondaryBufferDescription);
+                SecondaryBufferDescription.dwSize = sizeof(SecondaryBufferDescription);
                 // SecondaryBufferDescription.dwFlags = 0;
                 SecondaryBufferDescription.dwBufferBytes = BufferSize;
-                SecondaryBufferDescription.lpwfxFormat   = &Format;
+                SecondaryBufferDescription.lpwfxFormat = &Format;
 
                 HRESULT SecondaryBufferResult
                     = DirectSound->CreateSoundBuffer(&SecondaryBufferDescription, &GlobalSecondaryBuffer, 0);
@@ -255,9 +292,9 @@ static void Win32WriteToSoundBuffer(game_sound_buffer *SoundBuffer, win32_sound_
                                     DWORD BytesToWrite)
 {
     void *AudioPointer1 = 0;
-    DWORD AudioBytes1   = 0;
+    DWORD AudioBytes1 = 0;
     void *AudioPointer2 = 0;
-    DWORD AudioBytes2   = 0;
+    DWORD AudioBytes2 = 0;
     assert((AudioBytes1 / SoundOutput->BytesPerSample) == 0);
     assert((AudioBytes2 / SoundOutput->BytesPerSample) == 0);
     if (GlobalSecondaryBuffer->Lock(ByteToLock, BytesToWrite, &AudioPointer1, &AudioBytes1, &AudioPointer2,
@@ -266,7 +303,7 @@ static void Win32WriteToSoundBuffer(game_sound_buffer *SoundBuffer, win32_sound_
     {
         int16 *Samples = SoundBuffer->Samples;
 
-        int16 *Sample       = (int16 *)AudioPointer1;
+        int16 *Sample = (int16 *)AudioPointer1;
         int SamplesToWrite1 = AudioBytes1 / SoundOutput->BytesPerSample;
         for (int SampleIndex = 0; SampleIndex < SamplesToWrite1; ++SampleIndex)
         {
@@ -275,7 +312,7 @@ static void Win32WriteToSoundBuffer(game_sound_buffer *SoundBuffer, win32_sound_
 
             ++SoundOutput->RunningSamples;
         }
-        Sample              = (int16 *)AudioPointer2;
+        Sample = (int16 *)AudioPointer2;
         int SamplesToWrite2 = AudioBytes2 / SoundOutput->BytesPerSample;
         for (int SampleIndex = 0; SampleIndex < SamplesToWrite2; ++SampleIndex)
         {
@@ -333,9 +370,9 @@ static void FreeGameCode(win32_game_code *GameCode)
 
     FreeLibrary(GameCode->GameDLL);
 
-    GameCode->GameDLL             = 0;
+    GameCode->GameDLL = 0;
     GameCode->UpdateGameAndRender = 0;
-    GameCode->GetSoundSamples     = 0;
+    GameCode->GetSoundSamples = 0;
 }
 
 static win32_game_code Win32LoadGameCode(char *GameFile, char *TempGameFile, char *LockFile)
@@ -352,8 +389,8 @@ static win32_game_code Win32LoadGameCode(char *GameFile, char *TempGameFile, cha
         if (Handle)
         {
             Result.GameDLLFileName = GameFile;
-            Result.GameDLL         = Handle;
-            Result.LastWriteTime   = Win32GetLastWriteTime(GameFile);
+            Result.GameDLL = Handle;
+            Result.LastWriteTime = Win32GetLastWriteTime(GameFile);
 
             Result.UpdateGameAndRender
                 = (update_game_and_render *)GetProcAddress(Result.GameDLL, "UpdateGameAndRender");
@@ -388,7 +425,7 @@ static LRESULT CALLBACK Win32MainCallWindowCallback(HWND Window, UINT Message, W
         // Clear the entire client window to black.
         RECT ClientRect;
         GetClientRect(Window, &ClientRect);
-        int ClientWidth  = ClientRect.right - ClientRect.left;
+        int ClientWidth = ClientRect.right - ClientRect.left;
         int ClientHeight = ClientRect.bottom - ClientRect.top;
         PatBlt(DeviceContext, 0, 0, ClientWidth, ClientHeight, BLACKNESS);
 
@@ -414,7 +451,7 @@ static void Win32ProcessButtonState(button_state *Button, bool IsDown)
     Button->IsDown = IsDown;
 }
 
-static void Win32ProcessPendingMessages(game_controller_input *Input)
+static void Win32ProcessPendingMessages(HWND Window, game_controller_input *Input)
 {
     // Process the message pump.
     MSG Message;
@@ -431,8 +468,8 @@ static void Win32ProcessPendingMessages(game_controller_input *Input)
         case WM_KEYDOWN:
         {
             uint32 KeyCode = (uint32)Message.wParam;
-            bool IsDown    = ((Message.lParam & (1 << 31)) == 0);
-            bool WasDown   = ((Message.lParam & (1 << 30)) != 0);
+            bool IsDown = ((Message.lParam & (1 << 31)) == 0);
+            bool WasDown = ((Message.lParam & (1 << 30)) != 0);
 
             if (IsDown != WasDown)
             {
@@ -451,6 +488,13 @@ static void Win32ProcessPendingMessages(game_controller_input *Input)
                 else if (KeyCode == 'D')
                 {
                     Win32ProcessButtonState(&Input->Right, IsDown);
+                }
+                else if (KeyCode == VK_RETURN)
+                {
+                    if (!IsDown && WasDown)
+                    {
+                        Input->IsFullScreen = !Input->IsFullScreen;
+                    }
                 }
             }
         }
@@ -486,11 +530,11 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
         }
     }
 
-    WNDCLASSA WindowClass     = {};
-    WindowClass.style         = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
-    WindowClass.lpfnWndProc   = Win32MainCallWindowCallback;
-    WindowClass.hInstance     = Instance;
-    WindowClass.hCursor       = LoadCursor(0, IDC_ARROW);
+    WNDCLASSA WindowClass = {};
+    WindowClass.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
+    WindowClass.lpfnWndProc = Win32MainCallWindowCallback;
+    WindowClass.hInstance = Instance;
+    WindowClass.hCursor = LoadCursor(0, IDC_ARROW);
     WindowClass.lpszClassName = "AdequateCubeWindowClass";
 
     if (RegisterClassA(&WindowClass))
@@ -501,7 +545,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
         {
             HDC DeviceContext = GetDC(Window);
 
-            game_memory Memory          = {};
+            game_memory Memory = {};
             Memory.PermanentStorageSize = Megabytes(64);
             Memory.PermanentStorage
                 = VirtualAlloc(0, Memory.PermanentStorageSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
@@ -509,9 +553,9 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
             Memory.TransientStorage
                 = VirtualAlloc(0, Memory.TransientStorageSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 
-            char GameDLLFileName[]     = "aqcube.dll";
+            char GameDLLFileName[] = "aqcube.dll";
             char GameTempDLLFileName[] = "aqcube_temp.dll";
-            char GameLockFile[]        = "lock.tmp";
+            char GameLockFile[] = "lock.tmp";
 
             if (Memory.PermanentStorage && Memory.TransientStorage)
             {
@@ -522,20 +566,21 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
 #if 1
                     UINT TimerResolutionMS = 1;
 
-                    int MonitorHz            = 60;
-                    int GameUpdateHz         = MonitorHz / 2;
+                    int MonitorHz = 60;
+                    int GameUpdateHz = MonitorHz / 2;
                     float TargetFrameSeconds = 1.0f / (float)GameUpdateHz;
 
                     bool TimeIsGranular = timeBeginPeriod(TimerResolutionMS) == TIMERR_NOERROR;
 #endif
 
-                    Win32ResizeBackBuffer(&GlobalBackBuffer, 960, 540);
+                    vector2 ClientSize = V2(960, 540);
+                    Win32ResizeBackBuffer(&GlobalBackBuffer, ClientSize);
 
-                    bool SoundIsValid              = false;
+                    bool SoundIsValid = false;
                     win32_sound_output SoundOutput = {};
-                    SoundOutput.SamplesPerSec      = 44100;
-                    SoundOutput.BytesPerSample     = 2 * sizeof(int16);
-                    SoundOutput.BufferSize         = SoundOutput.SamplesPerSec * SoundOutput.BytesPerSample;
+                    SoundOutput.SamplesPerSec = 44100;
+                    SoundOutput.BytesPerSample = 2 * sizeof(int16);
+                    SoundOutput.BufferSize = SoundOutput.SamplesPerSec * SoundOutput.BytesPerSample;
                     SoundOutput.LatencySampleCount = SoundOutput.SamplesPerSec / 15;
                     SoundOutput.SafetyBytes
                         = (SoundOutput.SamplesPerSec * SoundOutput.BytesPerSample) / GameUpdateHz / 3;
@@ -543,9 +588,11 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                     InitSound(Window, SoundOutput.SamplesPerSec, SoundOutput.BufferSize);
 
                     game_controller_input Input = {};
+                    game_controller_input *NewInput = &Input;
+                    bool IsFullScreen = false;
 
                     LARGE_INTEGER LastFrameCount = Win32GetClock();
-                    GlobalRunning                = true;
+                    GlobalRunning = true;
                     while (GlobalRunning)
                     {
                         FILETIME GameDLLWriteTime = Win32GetLastWriteTime(GameDLLFileName);
@@ -555,23 +602,32 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                             Game = Win32LoadGameCode(GameDLLFileName, GameTempDLLFileName, GameLockFile);
                         }
 
-                        Win32ProcessPendingMessages(&Input);
-                        Input.dt = TargetFrameSeconds; // TODO(joe): Should we measure this instead
+                        Win32ProcessPendingMessages(Window, NewInput);
+                        NewInput->dt = TargetFrameSeconds; // TODO(joe): Should we measure this instead
                         //            of assuming a constant frame time?
 
+                        if (IsFullScreen != NewInput->IsFullScreen)
+                        {
+                            Win32ToggleFullScreen(Window);
+                            vector2 WindowSize = (NewInput->IsFullScreen) ? Win32GetWindowSize(Window) : ClientSize;
+                            Win32ResizeBackBuffer(&GlobalBackBuffer, WindowSize);
+
+                            IsFullScreen = NewInput->IsFullScreen;
+                        }
+
                         game_back_buffer BackBuffer = {};
-                        BackBuffer.Memory           = GlobalBackBuffer.Memory;
-                        BackBuffer.Width            = GlobalBackBuffer.Width;
-                        BackBuffer.Height           = GlobalBackBuffer.Height;
-                        BackBuffer.Pitch            = GlobalBackBuffer.Pitch;
-                        BackBuffer.BytesPerPixel    = GlobalBackBuffer.BytesPerPixel;
+                        BackBuffer.Memory = GlobalBackBuffer.Memory;
+                        BackBuffer.Width = GlobalBackBuffer.Width;
+                        BackBuffer.Height = GlobalBackBuffer.Height;
+                        BackBuffer.Pitch = GlobalBackBuffer.Pitch;
+                        BackBuffer.BytesPerPixel = GlobalBackBuffer.BytesPerPixel;
 
                         if (Game.UpdateGameAndRender)
                         {
-                            Game.UpdateGameAndRender(&Memory, &BackBuffer, &Input);
+                            Game.UpdateGameAndRender(&Memory, &BackBuffer, NewInput);
                         }
 
-                        DWORD PlayCursor  = 0;
+                        DWORD PlayCursor = 0;
                         DWORD WriteCursor = 0;
                         if (GlobalSecondaryBuffer
                             && GlobalSecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor) == DS_OK)
@@ -579,7 +635,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                             if (!SoundIsValid)
                             {
                                 SoundOutput.RunningSamples = WriteCursor / SoundOutput.BytesPerSample;
-                                SoundIsValid               = true;
+                                SoundIsValid = true;
                             }
 
                             DWORD ByteToLock
@@ -588,7 +644,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                             DWORD ExpectedSoundBytesPerFrame
                                 = (SoundOutput.SamplesPerSec * SoundOutput.BytesPerSample) / GameUpdateHz;
                             DWORD ExpectedFrameBoundaryByte = PlayCursor + ExpectedSoundBytesPerFrame;
-                            DWORD SafeWriteCursor           = WriteCursor;
+                            DWORD SafeWriteCursor = WriteCursor;
                             if (SafeWriteCursor < PlayCursor)
                             {
                                 SafeWriteCursor += SoundOutput.BufferSize;
@@ -623,8 +679,8 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                             // of on every frame.
                             SoundBuffer.Samples = (int16 *)VirtualAlloc(0, SoundOutput.BufferSize,
                                                                         MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-                            SoundBuffer.SampleCount   = BytesToWrite / SoundOutput.BytesPerSample;
-                            SoundBuffer.ToneVolume    = SoundOutput.ToneVolume;
+                            SoundBuffer.SampleCount = BytesToWrite / SoundOutput.BytesPerSample;
+                            SoundBuffer.ToneVolume = SoundOutput.ToneVolume;
                             SoundBuffer.SamplesPerSec = SoundOutput.SamplesPerSec;
 
 #if 0
@@ -645,7 +701,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                         }
 #if 1
                         LARGE_INTEGER FrameCount = Win32GetClock();
-                        float ElapsedTime        = Win32GetElapsedSeconds(LastFrameCount, FrameCount);
+                        float ElapsedTime = Win32GetElapsedSeconds(LastFrameCount, FrameCount);
                         if (ElapsedTime < TargetFrameSeconds)
                         {
                             DWORD TimeToSleep = (DWORD)(1000.0f * (TargetFrameSeconds - ElapsedTime));

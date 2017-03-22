@@ -61,6 +61,7 @@ typedef struct button_state
 } button_state;
 typedef struct game_controller_input
 {
+    bool IsFullScreen;
     float dt;
 
     button_state Up;
