@@ -150,7 +150,6 @@ BOOL Win32DirectInputEnumObjectCallback(LPCDIDEVICEOBJECTINSTANCE ObjectInstance
 
     switch (ObjectType)
     {
-    // TODO(joe): The axises are absolute! Adjust the data format accordingly.
     case DIDFT_AXIS:
         OutputDebugStringA("DIDFT_AXIS\n");
         break;
@@ -666,7 +665,9 @@ static IDirectInputDevice8 *Win32InitDirectInputController(HINSTANCE Instance, H
 
                 // TODO(joe): DISCL_FOREGROUND?
                 Device->SetCooperativeLevel(Window, DISCL_BACKGROUND | DISCL_EXCLUSIVE);
+#if 0
                 Device->EnumObjects(Win32DirectInputEnumObjectCallback, 0, DIDFT_ALL);
+#endif
                 Win32SetControllerDataFormat(Device);
                 Result = Device->Acquire();
                 if (Result != DI_OK)
