@@ -32,6 +32,8 @@ typedef uint64_t u64;
 #define Megabytes(Value) ((Kilobytes(Value)) * 1024)
 #define Gigabytes(Value) ((Megabytes(Value)) * 1024)
 
+#define ArrayCount(Array) sizeof((Array)) / sizeof((Array[0]))
+
 // Note(joe): These are services to the game provided by the platform layer.
 typedef struct read_file_result
 {
