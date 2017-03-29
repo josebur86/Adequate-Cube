@@ -86,6 +86,12 @@ inline r32 Pow(r32 V, r32 E)
     return powf(V, E);
 }
 
+inline s32 Abs(s32 V)
+{
+    s32 Result = (V < 0) ? -V : V;
+    return Result;
+}
+
 //
 // Vector2 operations
 //
@@ -122,6 +128,24 @@ inline vector2 operator+(vector2 A, vector2 B)
     return Result;
 }
 
+inline vector2 & operator+=(vector2 &A, vector2 B)
+{
+    A.X += B.X;
+    A.Y += B.Y;
+
+    return A;
+}
+
+inline vector2 Normalize(vector2 V)
+{
+    r32 Length = SquareRoot(V.X * V.X + V.Y * V.Y);
+
+    vector2 Result;
+    Result.X = V.X / Length;
+    Result.Y = V.Y / Length;
+
+    return Result;
+}
 //
 // Vector3 operations
 //

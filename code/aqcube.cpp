@@ -51,8 +51,8 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
     game_state *GameState = (game_state *)Memory->PermanentStorage;
     if (!Memory->IsInitialized)
     {
-        GameState->Ship.P.X    = (float)BackBuffer->Width / 2;
-        GameState->Ship.P.Y    = (float)BackBuffer->Height / 2;
+        GameState->Ship.P.X = (float)BackBuffer->Width / 2;
+        GameState->Ship.P.Y = (float)BackBuffer->Height / 2;
         GameState->Ship.Size.X = 80.0f;
         GameState->Ship.Size.Y = 40.0f;
 
@@ -65,52 +65,67 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
 
     vector2 ddP = { 0.0f, 0.0f };
 
-    if (Input->Down.IsDown)
+    for (u32 ControllerIndex = 0; ControllerIndex < ArrayCount(Input->Controllers); ++ControllerIndex)
     {
-        ddP.Y = 1.0f;
-    }
-    if (Input->Up.IsDown)
-    {
-        ddP.Y = -1.0f;
-    }
-    if (Input->Right.IsDown)
-    {
-        ddP.X = 1.0f;
-    }
-    if (Input->Left.IsDown)
-    {
-        ddP.X = -1.0f;
-    }
-    if ((Input->Down.IsDown || Input->Up.IsDown) && (Input->Right.IsDown || Input->Left.IsDown))
-    {
-        ddP = ddP * 0.707f;
+        game_controller *Controller = Input->Controllers + ControllerIndex;
+        if (Controller->IsConnected)
+        {
+            if (Controller->IsAnalog)
+            {
+                ddP += V2(Controller->XAxis, Controller->YAxis);
+            }
+            else
+            {
+                if (Controller->Down.IsDown)
+                {
+                    ddP.Y = 1.0f;
+                }
+                if (Controller->Up.IsDown)
+                {
+                    ddP.Y = -1.0f;
+                }
+                if (Controller->Right.IsDown)
+                {
+                    ddP.X = 1.0f;
+                }
+                if (Controller->Left.IsDown)
+                {
+                    ddP.X = -1.0f;
+                }
+                if ((Controller->Down.IsDown || Controller->Up.IsDown)
+                    && (Controller->Right.IsDown || Controller->Left.IsDown))
+                {
+                    ddP = ddP * 0.707f;
+                }
+            }
+        }
     }
 
     float ShipSpeed = 2000.0f; // pixels / sec^2
-    ddP             = ddP * ShipSpeed; // TODO(joe): Overload *= for vectors
-    ddP             = -5.0f * Ship->dP + ddP;
+    ddP = ddP * ShipSpeed; // TODO(joe): Overload *= for vectors
+    ddP = -5.0f * Ship->dP + ddP;
 
-    Ship->P  = (0.5f * ddP * Square(Input->dt)) + (Ship->dP * Input->dt) + Ship->P;
+    Ship->P = (0.5f * ddP * Square(Input->dt)) + (Ship->dP * Input->dt) + Ship->P;
     Ship->dP = (ddP * Input->dt) + Ship->dP;
 
     if (Ship->P.X < 0.0)
     {
-        Ship->P.X  = 0.0f;
+        Ship->P.X = 0.0f;
         Ship->dP.X = 0.0f;
     }
     if (Ship->P.Y < 0.0)
     {
-        Ship->P.Y  = 0.0f;
+        Ship->P.Y = 0.0f;
         Ship->dP.Y = 0.0f;
     }
     if (Ship->P.X + Ship->Size.X >= BackBuffer->Width)
     {
-        Ship->P.X  = BackBuffer->Width - Ship->Size.X - 1.0f;
+        Ship->P.X = BackBuffer->Width - Ship->Size.X - 1.0f;
         Ship->dP.X = 0.0f;
     }
     if (Ship->P.Y + Ship->Size.Y >= BackBuffer->Height)
     {
-        Ship->P.Y  = BackBuffer->Height - Ship->Size.Y - 1.0f;
+        Ship->P.Y = BackBuffer->Height - Ship->Size.Y - 1.0f;
         Ship->dP.Y = 0.0f;
     }
 
@@ -130,7 +145,7 @@ extern "C" GET_SOUND_SAMPLES(GetSoundSamples)
     int16 *Sample = SoundBuffer->Samples;
     for (int SampleIndex = 0; SampleIndex < SoundBuffer->SampleCount; ++SampleIndex)
     {
-        float SineValue  = sinf(tSine);
+        float SineValue = sinf(tSine);
         uint16 ToneValue = (uint16)(SoundBuffer->ToneVolume * SineValue);
 
         *Sample++ = ToneValue; // Left

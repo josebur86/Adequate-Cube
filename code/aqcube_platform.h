@@ -57,20 +57,6 @@ typedef struct game_memory
     bool IsInitialized;
 } game_memory;
 
-typedef struct button_state
-{
-    bool IsDown;
-} button_state;
-typedef struct game_controller_input
-{
-    bool IsFullScreen;
-    float dt;
-
-    button_state Up;
-    button_state Down;
-    button_state Left;
-    button_state Right;
-} game_controller_input;
 typedef struct game_back_buffer
 {
     void *Memory;
@@ -87,7 +73,8 @@ typedef struct game_sound_buffer
     uint16 SamplesPerSec;
 } game_sound_buffer;
 
-#define UPDATE_GAME_AND_RENDER(name) void (name)(game_memory *Memory, game_back_buffer *BackBuffer, game_controller_input *Input)
+struct game_input;
+#define UPDATE_GAME_AND_RENDER(name) void (name)(game_memory *Memory, game_back_buffer *BackBuffer, game_input *Input)
 typedef UPDATE_GAME_AND_RENDER(update_game_and_render);
 
 #define GET_SOUND_SAMPLES(name) void (name)(game_sound_buffer *SoundBuffer, game_memory *Memory)

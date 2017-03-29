@@ -45,3 +45,30 @@ struct game_state
     int ToneHz;
 };
 
+// TODO(joe): Include the transition count?
+struct controller_button_state
+{
+    bool IsDown;
+};
+
+struct game_controller
+{
+    bool IsConnected;
+    bool IsAnalog;
+
+    controller_button_state Up;
+    controller_button_state Down;
+    controller_button_state Left;
+    controller_button_state Right;
+
+    r32 XAxis;
+    r32 YAxis;
+};
+
+struct game_input
+{
+    float dt;
+
+    game_controller Controllers[2];
+};
+

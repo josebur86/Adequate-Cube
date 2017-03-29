@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <stdio.h>
 
+#include "aqcube.h"
 #include "aqcube_platform.h"
 #include "aqcube_math.h"
 
@@ -564,13 +565,13 @@ static LRESULT CALLBACK Win32MainCallWindowCallback(HWND Window, UINT Message, W
     return Result;
 }
 
-static void Win32ProcessButtonState(button_state *Button, bool IsDown)
+static void Win32ProcessButtonState(controller_button_state *Button, bool IsDown)
 {
     assert(Button->IsDown != IsDown);
     Button->IsDown = IsDown;
 }
 
-static void Win32ProcessPendingMessages(HWND Window, game_controller_input *Input)
+static void Win32ProcessPendingMessages(HWND Window, game_controller *KeyboardController)
 {
     // Process the message pump.
     MSG Message;
@@ -594,25 +595,25 @@ static void Win32ProcessPendingMessages(HWND Window, game_controller_input *Inpu
             {
                 if (KeyCode == 'W')
                 {
-                    Win32ProcessButtonState(&Input->Up, IsDown);
+                    Win32ProcessButtonState(&KeyboardController->Up, IsDown);
                 }
                 else if (KeyCode == 'S')
                 {
-                    Win32ProcessButtonState(&Input->Down, IsDown);
+                    Win32ProcessButtonState(&KeyboardController->Down, IsDown);
                 }
                 else if (KeyCode == 'A')
                 {
-                    Win32ProcessButtonState(&Input->Left, IsDown);
+                    Win32ProcessButtonState(&KeyboardController->Left, IsDown);
                 }
                 else if (KeyCode == 'D')
                 {
-                    Win32ProcessButtonState(&Input->Right, IsDown);
+                    Win32ProcessButtonState(&KeyboardController->Right, IsDown);
                 }
                 else if (KeyCode == VK_RETURN)
                 {
                     if (!IsDown && WasDown)
                     {
-                        Input->IsFullScreen = !Input->IsFullScreen;
+                        Win32ToggleFullScreen(Window);
                     }
                 }
             }
@@ -682,6 +683,17 @@ static IDirectInputDevice8 *Win32InitDirectInputController(HINSTANCE Instance, H
     return Device;
 }
 
+static r32 NormalizeControllerAxis(s32 Value, s32 Center, s32 DeadZone)
+{
+    r32 Result = 0.0f;
+    if (Abs(Value - Center) > DeadZone)
+    {
+        Result = (Value - Center) / (r32)Center;
+    }
+
+    return Result;
+}
+
 int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLine, int ShowCode)
 {
     Win32LoadDirectInput();
@@ -744,9 +756,10 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                     SoundOutput.ToneVolume = 1600;
                     InitSound(Window, SoundOutput.SamplesPerSec, SoundOutput.BufferSize);
 
-                    game_controller_input Input = {};
-                    game_controller_input *NewInput = &Input;
-                    bool IsFullScreen = false;
+                    game_input Input = {};
+                    game_input *NewInput = &Input;
+                    game_controller *KeyboardController = NewInput->Controllers;
+                    KeyboardController->IsConnected = true;
 
                     LARGE_INTEGER LastFrameCount = Win32GetClock();
                     GlobalRunning = true;
@@ -759,30 +772,46 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                             Game = Win32LoadGameCode(GameDLLFileName, GameTempDLLFileName, GameLockFile);
                         }
 
-                        Win32ProcessPendingMessages(Window, NewInput);
+                        Win32ProcessPendingMessages(Window, KeyboardController);
                         NewInput->dt = TargetFrameSeconds; // TODO(joe): Should we measure this instead
                         //            of assuming a constant frame time?
 
                         if (Controller)
                         {
+                            game_controller *AnalogController = NewInput->Controllers + 1;
+                            AnalogController->IsConnected = true;
+                            AnalogController->IsAnalog = true;
+
+#if 0
+                            // TODO(joe): Is it possible to get this value from a PlayStation 4
+                            // controller using DirectInput?
+                            DIPROPDWORD DeadZone = {};
+                            DeadZone.diph.dwSize = sizeof(DIPROPDWORD);
+                            DeadZone.diph.dwHeaderSize = sizeof(DIPROPHEADER);
+                            DeadZone.diph.dwObj = 0;
+                            DeadZone.diph.dwHow = DIPH_DEVICE;
+                            HRESULT Result = Controller->GetProperty(DIPROP_DEADZONE, &DeadZone.diph);
+#else
+                            DWORD DeadZone = 1000;
+#endif
+
                             ControllerDataFormat ControllerState = {};
                             if (Controller->GetDeviceState(sizeof(ControllerDataFormat), &ControllerState) == DI_OK)
                             {
+#if 0
                                 char Buffer[256];
                                 snprintf(Buffer, sizeof(Buffer), "XAxis: %li\tYAxis: %li\t Square: %u\n",
                                          ControllerState.XAxis, ControllerState.YAxis, ControllerState.Buttons[0]);
                                 OutputDebugStringA(Buffer);
+#endif
+
+                                s32 Center = 32768;
+                                AnalogController->XAxis = NormalizeControllerAxis(ControllerState.XAxis, Center, DeadZone);
+                                AnalogController->YAxis = NormalizeControllerAxis(ControllerState.YAxis, Center, DeadZone);
                             }
                         }
 
-                        if (IsFullScreen != NewInput->IsFullScreen)
-                        {
-                            Win32ToggleFullScreen(Window);
-                            vector2 WindowSize = (NewInput->IsFullScreen) ? Win32GetWindowSize(Window) : ClientSize;
-                            Win32ResizeBackBuffer(&GlobalBackBuffer, WindowSize);
-
-                            IsFullScreen = NewInput->IsFullScreen;
-                        }
+                        //Win32ResizeBackBuffer(&GlobalBackBuffer, WindowSize);
 
                         game_back_buffer BackBuffer = {};
                         BackBuffer.Memory = GlobalBackBuffer.Memory;
