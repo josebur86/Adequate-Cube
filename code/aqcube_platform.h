@@ -19,6 +19,9 @@ typedef uint64_t uint64;
 
 typedef float r32;
 
+typedef int8_t s8;
+typedef uint8_t u8;
+
 typedef int32_t s32;
 typedef uint32_t u32;
 
@@ -44,6 +47,17 @@ read_file_result DEBUGWin32ReadFile(char *Filename);
 bool DEBUGWin32WriteFile(char *Filename, void *Memory, uint64 FileSize);
 void Win32FreeMemory(void *Memory);
 
+typedef struct loaded_bitmap
+{
+    bool IsValid;
+
+    u32 Width;
+    u32 Height;
+    u32 Pitch;
+    u8 *Pixels;
+} loaded_bitmap;
+typedef loaded_bitmap debug_load_bitmap(char *Filename);
+
 // Note(joe): These are services to the platform layer provided by the game.
 typedef struct game_memory
 {
@@ -53,6 +67,8 @@ typedef struct game_memory
     void *TransientStorage; // This should always be cleared to zero.
 
     // TODO(joe): Add function pointers when we need access to the platform specific services from the game.
+    debug_load_bitmap *DEBUGLoadBitmap;
+
 
     bool IsInitialized;
 } game_memory;

@@ -7,6 +7,13 @@
 #include <assert.h>
 #include <stdio.h>
 
+#define STB_IMAGE_IMPLEMENTATION
+#pragma warning(push)
+#pragma warning(disable : 4244)
+#pragma warning(disable : 4456)
+#include "stb_image.h"
+#pragma warning(pop)
+
 #include "aqcube.h"
 #include "aqcube_platform.h"
 #include "aqcube_math.h"
@@ -254,6 +261,35 @@ void Win32FreeMemory(void *Memory)
         VirtualFree(Memory, 0, MEM_RELEASE);
         Memory = 0;
     }
+}
+
+static loaded_bitmap DEBUGLoadBitmap(char *FileName)
+{
+    // TODO(joe): Correct the wrong pixel colors. The ships glass should be blue.
+    loaded_bitmap Result = {};
+
+    s32 X, Y, N;
+    u8 *Pixels = stbi_load(FileName, &X, &Y, &N, 0);
+    if (Pixels)
+    {
+        Result.IsValid = true;
+        Result.Width = X;
+        Result.Height = Y;
+        Result.Pitch = X*N;
+        s32 BufferSize = X*Y*N;
+        Result.Pixels = (u8 *)VirtualAlloc(0, BufferSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+
+        u8 *Source = Pixels;
+        u8 *Dest = Result.Pixels;
+        for (s32 Index = 0; Index < (s32)BufferSize; ++Index)
+        {
+            *Dest++ = *Source++;
+        }
+
+        stbi_image_free(Pixels);
+    }
+
+    return Result;
 }
 
 static bool GlobalRunning = true;
@@ -722,9 +758,11 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
             Memory.TransientStorage
                 = VirtualAlloc(0, Memory.TransientStorageSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 
-            char GameDLLFileName[] = "aqcube.dll";
-            char GameTempDLLFileName[] = "aqcube_temp.dll";
-            char GameLockFile[] = "lock.tmp";
+            Memory.DEBUGLoadBitmap = DEBUGLoadBitmap;
+
+            char GameDLLFileName[] = "../build/aqcube.dll";
+            char GameTempDLLFileName[] = "../build/aqcube_temp.dll";
+            char GameLockFile[] = "../build/lock.tmp";
 
             if (Memory.PermanentStorage && Memory.TransientStorage)
             {

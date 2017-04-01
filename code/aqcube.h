@@ -41,6 +41,7 @@ struct entity
 struct game_state
 {
     entity Ship;
+    loaded_bitmap Ship1;
 
     int ToneHz;
 };

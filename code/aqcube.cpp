@@ -38,12 +38,36 @@ static void DrawRectangle(game_back_buffer *BackBuffer, int X, int Y, int Width,
     }
 }
 
+static void DrawBitmap(game_back_buffer *BackBuffer, s32 X, s32 Y, loaded_bitmap Bitmap)
+{
+    // TODO(joe): Transparency
+    
+    u8 *Row = Bitmap.Pixels;
+
+    for (s32 RowIndex = 0; RowIndex < (s32)Bitmap.Height; ++RowIndex)
+    {
+        u32 *Source = (u32 *)Row;
+        u32 *Dest = (u32 *)BackBuffer->Memory + ((Y + RowIndex) * BackBuffer->Width) + X;
+
+        for (s32 ColIndex = 0; ColIndex < (s32)Bitmap.Width; ++ColIndex)
+        {
+            if (X + ColIndex < BackBuffer->Width && X + ColIndex >= 0 && 
+                Y + RowIndex < BackBuffer->Height && Y + RowIndex >= 0)
+            {
+                *Dest++ = *Source++;    
+            }
+        }
+
+        Row += Bitmap.Pitch;
+    }
+}
+
 static void Render(game_back_buffer *BackBuffer, game_state *GameState)
 {
     ClearBuffer(BackBuffer, 0, 43, 54);
 
     entity Ship = GameState->Ship;
-    DrawRectangle(BackBuffer, (int)Ship.P.X, (int)Ship.P.Y, (int)Ship.Size.X, (int)Ship.Size.Y, 181, 137, 0);
+    DrawBitmap(BackBuffer, (s32)Ship.P.X, (s32)Ship.P.Y, GameState->Ship1);
 }
 
 extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
@@ -51,10 +75,12 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
     game_state *GameState = (game_state *)Memory->PermanentStorage;
     if (!Memory->IsInitialized)
     {
-        GameState->Ship.P.X = (float)BackBuffer->Width / 2;
-        GameState->Ship.P.Y = (float)BackBuffer->Height / 2;
+        GameState->Ship.P.X = 10.0f; //(float)BackBuffer->Width / 2;
+        GameState->Ship.P.Y = 10.0f; //(float)BackBuffer->Height / 2;
         GameState->Ship.Size.X = 80.0f;
         GameState->Ship.Size.Y = 40.0f;
+
+        GameState->Ship1 = Memory->DEBUGLoadBitmap("Ship-1.png");
 
         GameState->ToneHz = 256;
 
