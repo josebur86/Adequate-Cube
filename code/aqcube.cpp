@@ -40,25 +40,43 @@ static void DrawRectangle(game_back_buffer *BackBuffer, int X, int Y, int Width,
 
 static void DrawBitmap(game_back_buffer *BackBuffer, s32 X, s32 Y, loaded_bitmap Bitmap)
 {
-    // TODO(joe): Transparency
-    
-    u8 *Row = Bitmap.Pixels;
+    u8 *SourceRow = Bitmap.Pixels;
+    u8 *DestRow = (u8 *)((u32 *)BackBuffer->Memory + (Y * BackBuffer->Width) + X);
 
     for (s32 RowIndex = 0; RowIndex < (s32)Bitmap.Height; ++RowIndex)
     {
-        u32 *Source = (u32 *)Row;
-        u32 *Dest = (u32 *)BackBuffer->Memory + ((Y + RowIndex) * BackBuffer->Width) + X;
+        u32 *SourcePixel = (u32 *)SourceRow;
+        u32 *DestPixel = (u32 *)DestRow;
 
         for (s32 ColIndex = 0; ColIndex < (s32)Bitmap.Width; ++ColIndex)
         {
             if (X + ColIndex < BackBuffer->Width && X + ColIndex >= 0 && 
                 Y + RowIndex < BackBuffer->Height && Y + RowIndex >= 0)
             {
-                *Dest++ = *Source++;    
+                r32 SA = ((r32)((*SourcePixel >> 24) & 0xFF) / 255.0f);
+                r32 DA = 1.0f - SA; //(SA > 0.0f) ? 1.0f / SA : 1.0f;
+
+                u8 SR = ((*SourcePixel >> 0)  & 0xFF);
+                u8 SG = ((*SourcePixel >> 8)  & 0xFF);
+                u8 SB = ((*SourcePixel >> 16) & 0xFF);
+
+                u8 DR = ((*DestPixel >> 0)  & 0xFF);
+                u8 DG = ((*DestPixel >> 8)  & 0xFF);
+                u8 DB = ((*DestPixel >> 16) & 0xFF);
+
+                u32 C = (u8(DA * DR + SA * SR) << 0) | 
+                        (u8(DA * DG + SA * SG) << 8) |
+                        (u8(DA * DB + SA * SB) << 16);
+
+                *DestPixel = C;
             }
+
+            ++DestPixel;
+            ++SourcePixel;
         }
 
-        Row += Bitmap.Pitch;
+        DestRow += BackBuffer->Pitch;
+        SourceRow += Bitmap.Pitch;
     }
 }
 
@@ -75,8 +93,8 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
     game_state *GameState = (game_state *)Memory->PermanentStorage;
     if (!Memory->IsInitialized)
     {
-        GameState->Ship.P.X = 10.0f; //(float)BackBuffer->Width / 2;
-        GameState->Ship.P.Y = 10.0f; //(float)BackBuffer->Height / 2;
+        GameState->Ship.P.X = (float)BackBuffer->Width / 8;
+        GameState->Ship.P.Y = (float)BackBuffer->Height / 2;
         GameState->Ship.Size.X = 80.0f;
         GameState->Ship.Size.Y = 40.0f;
 

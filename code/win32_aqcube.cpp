@@ -265,7 +265,6 @@ void Win32FreeMemory(void *Memory)
 
 static loaded_bitmap DEBUGLoadBitmap(char *FileName)
 {
-    // TODO(joe): Correct the wrong pixel colors. The ships glass should be blue.
     loaded_bitmap Result = {};
 
     s32 X, Y, N;
@@ -279,11 +278,28 @@ static loaded_bitmap DEBUGLoadBitmap(char *FileName)
         s32 BufferSize = X*Y*N;
         Result.Pixels = (u8 *)VirtualAlloc(0, BufferSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 
-        u8 *Source = Pixels;
-        u8 *Dest = Result.Pixels;
-        for (s32 Index = 0; Index < (s32)BufferSize; ++Index)
+        u8 *SourceRow = Pixels;
+        u8 *DestRow = Result.Pixels;
+        for (s32 RowIndex = 0; RowIndex < (s32)Y; ++RowIndex)
         {
-            *Dest++ = *Source++;
+            u32 *SourcePixel = (u32 *)SourceRow;
+            u32 *DestPixel = (u32 *)DestRow;
+            for (s32 ColIndex = 0; ColIndex < (s32)X; ++ColIndex)
+            {
+                u8 R = (u8)(*SourcePixel >> 0  & 0xFF);
+                u8 G = (u8)(*SourcePixel >> 8  & 0xFF);
+                u8 B = (u8)(*SourcePixel >> 16 & 0xFF);
+                u8 A = (u8)(*SourcePixel >> 24 & 0xFF);
+
+                u32 Pixel = (A << 24) | (R << 16) | (G << 8) | (B << 0);
+                *DestPixel = Pixel;
+
+                ++SourcePixel;
+                ++DestPixel;
+            }
+
+            SourceRow += Result.Pitch;
+            DestRow += Result.Pitch;
         }
 
         stbi_image_free(Pixels);
