@@ -4,9 +4,9 @@
 #include <math.h>
 #include <float.h>
 
-#define PI 3.14159265359f
-#define DEG_TO_RAD (PI) / (180.0f)
-#define RAD_TO_DEG (180.0f) / (PI)
+#define PI32 3.14159265359f
+#define DEG_TO_RAD (PI32) / (180.0f)
+#define RAD_TO_DEG (180.0f) / (PI32)
 
 #define EPSILON 1.192092896e-07f
 #define REAL32MAX FLT_MAX

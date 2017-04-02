@@ -80,12 +80,56 @@ static void DrawBitmap(game_back_buffer *BackBuffer, s32 X, s32 Y, loaded_bitmap
     }
 }
 
+static font_glyph * GetFontGlyphFor(game_state *GameState, char C)
+{
+    font_glyph *Glyph = GameState->FontGlyphs + (C - 32);
+    if (!Glyph->IsLoaded)
+    {
+        Glyph->Glyph = GameState->Platform.DEBUGLoadFontGlyph(&GameState->Arena, C);
+        Assert(Glyph->Glyph.IsValid);
+        Glyph->IsLoaded = true;
+    }
+
+    return Glyph;
+}
+
+static u32 AtX = 10;
+static u32 AtY = 10;
+
+static void DEBUGDrawLine(game_back_buffer *BackBuffer, game_state *GameState, char *Text)
+{
+    while(Text && *Text != '\0')
+    {
+        if (*Text != ' ')
+        {
+            font_glyph *Glyph = GetFontGlyphFor(GameState, *Text);
+            Assert(Glyph->IsLoaded);
+
+            DrawBitmap(BackBuffer, AtX, AtY, Glyph->Glyph);
+            AtX += Glyph->Glyph.Width;
+        }
+        else
+        {
+            AtX += 30;
+        }
+
+        ++Text;
+    }
+
+    AtY += 20;
+}
+
 static void Render(game_back_buffer *BackBuffer, game_state *GameState)
 {
+    AtX = 10;
+    AtY = 10;
+   
     ClearBuffer(BackBuffer, 0, 43, 54);
 
     entity Ship = GameState->Ship;
-    DrawBitmap(BackBuffer, (s32)Ship.P.X, (s32)Ship.P.Y, GameState->Ship1);
+    DrawBitmap(BackBuffer, (s32)Ship.P.X, (s32)Ship.P.Y, GameState->ShipBitmap);
+
+    DEBUGDrawLine(BackBuffer, GameState, "Adequate Cube");
 }
 
 extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
@@ -93,12 +137,17 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
     game_state *GameState = (game_state *)Memory->PermanentStorage;
     if (!Memory->IsInitialized)
     {
+        GameState->Platform.DEBUGLoadBitmap = Memory->DEBUGLoadBitmap;
+        GameState->Platform.DEBUGLoadFontGlyph = Memory->DEBUGLoadFontGlyph;
+
+        GameState->Arena = InitializeArena((u64)((u8 *)Memory->PermanentStorage + sizeof(*GameState)), Gigabytes(1));
+
         GameState->Ship.P.X = (float)BackBuffer->Width / 8;
         GameState->Ship.P.Y = (float)BackBuffer->Height / 2;
         GameState->Ship.Size.X = 80.0f;
         GameState->Ship.Size.Y = 40.0f;
 
-        GameState->Ship1 = Memory->DEBUGLoadBitmap("Ship-1.png");
+        GameState->ShipBitmap = GameState->Platform.DEBUGLoadBitmap(&GameState->Arena, "Ship-1.png");
 
         GameState->ToneHz = 256;
 

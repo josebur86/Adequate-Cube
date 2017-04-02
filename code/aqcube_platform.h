@@ -20,14 +20,46 @@ typedef uint32_t u32;
 typedef int64_t s64;
 typedef uint64_t u64;
 
-// TODO(joe): This constant should move into the math specific files.
-#define PI32 3.14159265359f
-
 #define Kilobytes(Value) ((Value) * 1024)
 #define Megabytes(Value) ((Kilobytes(Value)) * 1024)
 #define Gigabytes(Value) ((Megabytes(Value)) * 1024)
 
+#define Assert(Condition) if (!(Condition)) { *(int *)0 = 0; }
 #define ArrayCount(Array) sizeof((Array)) / sizeof((Array[0]))
+
+//
+// Arena
+//
+struct arena
+{
+    u64 BaseAddress;
+    u64 Size;
+    u64 MaxSize;
+};
+
+arena InitializeArena(u64 BaseAddress, u64 MaxSize)
+{
+    arena Result = {};
+    Result.BaseAddress = BaseAddress;
+    Result.MaxSize = MaxSize;
+
+    return Result;
+}
+
+void *PushSize(arena *Arena, u64 Size)
+{
+    Assert(Arena->Size + Size <= Arena->MaxSize);
+
+    void *Result = (void *)(Arena->BaseAddress + Arena->Size);
+    
+    Arena->Size += Size;
+
+    return Result;
+}
+
+//
+// Debug File Operations
+//
 
 // Note(joe): These are services to the game provided by the platform layer.
 typedef struct read_file_result
@@ -48,7 +80,14 @@ typedef struct loaded_bitmap
     u32 Pitch;
     u8 *Pixels;
 } loaded_bitmap;
-typedef loaded_bitmap debug_load_bitmap(char *Filename);
+typedef loaded_bitmap debug_load_bitmap(arena *Arena, char *Filename);
+
+struct font_glyph
+{
+    bool IsLoaded;
+    loaded_bitmap Glyph;
+};
+typedef loaded_bitmap debug_load_font_glyph(arena *Arena, char C);
 
 // Note(joe): These are services to the platform layer provided by the game.
 typedef struct game_memory
@@ -60,7 +99,7 @@ typedef struct game_memory
 
     // TODO(joe): Add function pointers when we need access to the platform specific services from the game.
     debug_load_bitmap *DEBUGLoadBitmap;
-
+    debug_load_font_glyph *DEBUGLoadFontGlyph;
 
     bool IsInitialized;
 } game_memory;

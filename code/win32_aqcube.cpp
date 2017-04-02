@@ -4,7 +4,6 @@
 #include <dsound.h>
 #include <windows.h>
 
-#include <assert.h>
 #include <stdio.h>
 
 #pragma warning(push)
@@ -14,9 +13,37 @@
 #include "stb_image.h"
 #pragma warning(pop)
 
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "stb_truetype.h"
+
 #include "aqcube.h"
 #include "aqcube_platform.h"
 #include "aqcube_math.h"
+
+//
+// Font
+//
+struct font_data
+{
+    bool IsLoaded;
+    stbtt_fontinfo FontInfo;
+};
+static font_data GlobalDebugFont;
+
+read_file_result DEBUGWin32ReadFile(char *FileName);
+static font_data Win32InitFont(char *FontFileName)
+{
+    font_data Result = {};
+
+    read_file_result FontFile = DEBUGWin32ReadFile(FontFileName);
+    if (FontFile.Contents)
+    {
+        Result.IsLoaded = true;
+        stbtt_InitFont(&Result.FontInfo, (u8 *)FontFile.Contents, stbtt_GetFontOffsetForIndex((u8 *)FontFile.Contents, 0));
+    }
+
+    return Result;
+}
 
 //
 // DirectInput
@@ -101,7 +128,7 @@ static bool Win32SetControllerDataFormat(IDirectInputDevice8 *Device)
               DIDFT_PSHBUTTON | DIDFT_MAKEINSTANCE(13), 0 },
           };
 
-    assert(PS4Data[0].dwOfs % 4 == 0);
+    Assert(PS4Data[0].dwOfs % 4 == 0);
 
     DWORD ObjectCount = ArrayCount(PS4Data);
 
@@ -113,8 +140,8 @@ static bool Win32SetControllerDataFormat(IDirectInputDevice8 *Device)
     Format.dwNumObjs = ObjectCount;
     Format.rgodf = PS4Data;
 
-    assert(Format.dwDataSize % 4 == 0);
-    assert(Format.dwDataSize > PS4Data[ObjectCount - 1].dwOfs);
+    Assert(Format.dwDataSize % 4 == 0);
+    Assert(Format.dwDataSize > PS4Data[ObjectCount - 1].dwOfs);
 
     HRESULT Result = Device->SetDataFormat(&Format);
     return Result == DI_OK;
@@ -263,7 +290,7 @@ void Win32FreeMemory(void *Memory)
     }
 }
 
-static loaded_bitmap DEBUGLoadBitmap(char *FileName)
+static loaded_bitmap DEBUGLoadBitmap(arena *Arena, char *FileName)
 {
     loaded_bitmap Result = {};
 
@@ -277,8 +304,7 @@ static loaded_bitmap DEBUGLoadBitmap(char *FileName)
         Result.Pitch = X*N;
         s32 BufferSize = X*Y*N;
 
-        // TODO(joe): Allocate from an arena.
-        Result.Pixels = (u8 *)VirtualAlloc(0, BufferSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+        Result.Pixels = (u8 *)PushSize(Arena, BufferSize); 
 
         u8 *SourceRow = Pixels;
         u8 *DestRow = Result.Pixels;
@@ -309,6 +335,49 @@ static loaded_bitmap DEBUGLoadBitmap(char *FileName)
 
     return Result;
 }
+
+static loaded_bitmap DEBUGLoadFontGlyph(arena *Arena, char C)
+{
+    Assert(GlobalDebugFont.IsLoaded);
+
+    loaded_bitmap Result = {};
+
+    r32 FontScale = 80.0f;
+    s32 FontWidth;
+    s32 FontHeight;
+
+    u8 *Bitmap = stbtt_GetCodepointBitmap(&GlobalDebugFont.FontInfo, 
+                                          0, 
+                                          stbtt_ScaleForPixelHeight(&GlobalDebugFont.FontInfo, FontScale), 
+                                          C, 
+                                          &FontWidth, 
+                                          &FontHeight, 0, 0);
+    Assert(Bitmap);
+
+    Result.IsValid = true;
+    Result.Width = FontWidth;
+    Result.Height = FontHeight;
+    Result.Pitch = FontWidth*4;
+
+    u32 BufferSize = (u32)FontWidth*FontHeight*4;
+    Result.Pixels = (u8 *)PushSize(Arena, BufferSize);
+
+    u8 *Source = Bitmap;
+    u32 *Pixel = (u32 *)Result.Pixels;
+    for (u32 Index = 0; Index < BufferSize; ++Index)
+    {
+        u8 R = *Source;
+        u8 G = *Source;
+        u8 B = *Source;
+        u8 A = (R > 0) ? 0xFF : 0X00;
+        *Pixel = (A << 24) | (R << 16) | (G << 8) | (B << 0);
+
+        ++Source;
+        ++Pixel;
+    }
+
+    return Result;
+};
 
 static bool GlobalRunning = true;
 
@@ -469,8 +538,8 @@ static void Win32WriteToSoundBuffer(game_sound_buffer *SoundBuffer, win32_sound_
     DWORD AudioBytes1 = 0;
     void *AudioPointer2 = 0;
     DWORD AudioBytes2 = 0;
-    assert((AudioBytes1 / SoundOutput->BytesPerSample) == 0);
-    assert((AudioBytes2 / SoundOutput->BytesPerSample) == 0);
+    Assert((AudioBytes1 / SoundOutput->BytesPerSample) == 0);
+    Assert((AudioBytes2 / SoundOutput->BytesPerSample) == 0);
     if (GlobalSecondaryBuffer->Lock(ByteToLock, BytesToWrite, &AudioPointer1, &AudioBytes1, &AudioPointer2,
                                     &AudioBytes2, 0)
         == DS_OK)
@@ -621,7 +690,7 @@ static LRESULT CALLBACK Win32MainCallWindowCallback(HWND Window, UINT Message, W
 
 static void Win32ProcessButtonState(controller_button_state *Button, bool IsDown)
 {
-    assert(Button->IsDown != IsDown);
+    Assert(Button->IsDown != IsDown);
     Button->IsDown = IsDown;
 }
 
@@ -695,7 +764,7 @@ static IDirectInputDevice8 *Win32InitDirectInputController(HINSTANCE Instance, H
         EnumDeviceResult DeviceResult = {};
         Result = DirectInput->EnumDevices(DI8DEVCLASS_GAMECTRL, Win32DirectInputEnumDeviceCallback, &DeviceResult,
                                           DIEDFL_ALLDEVICES | DIEDFL_ATTACHEDONLY);
-        assert(Result == DI_OK);
+        Assert(Result == DI_OK);
         if (DeviceResult.DeviceFound)
         {
             Result = DirectInput->CreateDevice(DeviceResult.DeviceGuid, &Device, 0);
@@ -751,6 +820,7 @@ static r32 NormalizeControllerAxis(s32 Value, s32 Center, s32 DeadZone)
 int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLine, int ShowCode)
 {
     Win32LoadDirectInput();
+    GlobalDebugFont = Win32InitFont("C:/Windows/Fonts/SourceCodePro-Regular.ttf");
 
     WNDCLASSA WindowClass = {};
     WindowClass.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
@@ -777,6 +847,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                 = VirtualAlloc(0, Memory.TransientStorageSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 
             Memory.DEBUGLoadBitmap = DEBUGLoadBitmap;
+            Memory.DEBUGLoadFontGlyph = DEBUGLoadFontGlyph;
 
             char GameDLLFileName[] = "../build/aqcube.dll";
             char GameTempDLLFileName[] = "../build/aqcube_temp.dll";
@@ -903,7 +974,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                             {
                                 SafeWriteCursor += SoundOutput.BufferSize;
                             }
-                            assert(SafeWriteCursor >= PlayCursor);
+                            Assert(SafeWriteCursor >= PlayCursor);
                             SafeWriteCursor += SoundOutput.SafetyBytes;
                             bool AudioCardIsLowLatency = (SafeWriteCursor < ExpectedFrameBoundaryByte);
 

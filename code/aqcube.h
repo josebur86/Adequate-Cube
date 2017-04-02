@@ -27,6 +27,12 @@
 #include "aqcube_math.h"
 #include "aqcube_platform.h"
 
+struct platform
+{
+    debug_load_bitmap *DEBUGLoadBitmap;
+    debug_load_font_glyph *DEBUGLoadFontGlyph;
+};
+
 //
 // Entity
 //
@@ -40,10 +46,16 @@ struct entity
 
 struct game_state
 {
+    arena Arena;
+
     entity Ship;
-    loaded_bitmap Ship1;
+    loaded_bitmap ShipBitmap;
+
+    font_glyph FontGlyphs[('~' - '!') + 1];
 
     int ToneHz;
+
+    platform Platform;
 };
 
 // TODO(joe): Include the transition count?
