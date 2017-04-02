@@ -6,21 +6,13 @@ extern "C" {
 
 #include <stdint.h>
 
-// TODO(joe): Still trying to decide what kind of type names I like.
-typedef int8_t int8;
-typedef int16_t int16;
-typedef int32_t int32;
-typedef int64_t int64;
-
-typedef uint8_t uint8;
-typedef uint16_t uint16;
-typedef uint32_t uint32;
-typedef uint64_t uint64;
-
 typedef float r32;
 
 typedef int8_t s8;
 typedef uint8_t u8;
+
+typedef int16_t s16;
+typedef uint16_t u16;
 
 typedef int32_t s32;
 typedef uint32_t u32;
@@ -44,7 +36,7 @@ typedef struct read_file_result
     int SizeInBytes;
 } read_file_result;
 read_file_result DEBUGWin32ReadFile(char *Filename);
-bool DEBUGWin32WriteFile(char *Filename, void *Memory, uint64 FileSize);
+bool DEBUGWin32WriteFile(char *Filename, void *Memory, u64 FileSize);
 void Win32FreeMemory(void *Memory);
 
 typedef struct loaded_bitmap
@@ -61,9 +53,9 @@ typedef loaded_bitmap debug_load_bitmap(char *Filename);
 // Note(joe): These are services to the platform layer provided by the game.
 typedef struct game_memory
 {
-    uint64 PermanentStorageSize;
+    u64 PermanentStorageSize;
     void *PermanentStorage; // This should always be cleared to zero.
-    uint64 TransientStorageSize;
+    u64 TransientStorageSize;
     void *TransientStorage; // This should always be cleared to zero.
 
     // TODO(joe): Add function pointers when we need access to the platform specific services from the game.
@@ -83,10 +75,10 @@ typedef struct game_back_buffer
 } game_back_buffer;
 typedef struct game_sound_buffer
 {
-    int16 *Samples;
+    s16 *Samples;
     int SampleCount;
-    int16 ToneVolume;
-    uint16 SamplesPerSec;
+    s16 ToneVolume;
+    u16 SamplesPerSec;
 } game_sound_buffer;
 
 struct game_input;

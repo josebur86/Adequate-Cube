@@ -7,10 +7,10 @@
 #include <assert.h>
 #include <stdio.h>
 
-#define STB_IMAGE_IMPLEMENTATION
 #pragma warning(push)
 #pragma warning(disable : 4244)
 #pragma warning(disable : 4456)
+#define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #pragma warning(pop)
 
@@ -198,9 +198,9 @@ struct win32_sound_output
     DWORD BufferSize;
     DWORD SafetyBytes;
 
-    uint32 RunningSamples;
+    u32 RunningSamples;
     int LatencySampleCount;
-    int16 ToneVolume;
+    s16 ToneVolume;
 };
 
 read_file_result DEBUGWin32ReadFile(char *Filename)
@@ -236,7 +236,7 @@ read_file_result DEBUGWin32ReadFile(char *Filename)
     return Result;
 }
 
-bool DEBUGWin32WriteFile(char *Filename, void *Memory, uint32 FileSize)
+bool DEBUGWin32WriteFile(char *Filename, void *Memory, u32 FileSize)
 {
     bool Result = false;
     HANDLE FileHandle = CreateFileA(Filename, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
@@ -276,6 +276,8 @@ static loaded_bitmap DEBUGLoadBitmap(char *FileName)
         Result.Height = Y;
         Result.Pitch = X*N;
         s32 BufferSize = X*Y*N;
+
+        // TODO(joe): Allocate from an arena.
         Result.Pixels = (u8 *)VirtualAlloc(0, BufferSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 
         u8 *SourceRow = Pixels;
@@ -473,9 +475,9 @@ static void Win32WriteToSoundBuffer(game_sound_buffer *SoundBuffer, win32_sound_
                                     &AudioBytes2, 0)
         == DS_OK)
     {
-        int16 *Samples = SoundBuffer->Samples;
+        s16 *Samples = SoundBuffer->Samples;
 
-        int16 *Sample = (int16 *)AudioPointer1;
+        s16 *Sample = (s16 *)AudioPointer1;
         int SamplesToWrite1 = AudioBytes1 / SoundOutput->BytesPerSample;
         for (int SampleIndex = 0; SampleIndex < SamplesToWrite1; ++SampleIndex)
         {
@@ -484,7 +486,7 @@ static void Win32WriteToSoundBuffer(game_sound_buffer *SoundBuffer, win32_sound_
 
             ++SoundOutput->RunningSamples;
         }
-        Sample = (int16 *)AudioPointer2;
+        Sample = (s16 *)AudioPointer2;
         int SamplesToWrite2 = AudioBytes2 / SoundOutput->BytesPerSample;
         for (int SampleIndex = 0; SampleIndex < SamplesToWrite2; ++SampleIndex)
         {
@@ -639,7 +641,7 @@ static void Win32ProcessPendingMessages(HWND Window, game_controller *KeyboardCo
         case WM_KEYUP:
         case WM_KEYDOWN:
         {
-            uint32 KeyCode = (uint32)Message.wParam;
+            u32 KeyCode = (u32)Message.wParam;
             bool IsDown = ((Message.lParam & (1 << 31)) == 0);
             bool WasDown = ((Message.lParam & (1 << 30)) != 0);
 
@@ -770,7 +772,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
             Memory.PermanentStorageSize = Megabytes(64);
             Memory.PermanentStorage
                 = VirtualAlloc(0, Memory.PermanentStorageSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-            Memory.TransientStorageSize = Gigabytes((uint64)4);
+            Memory.TransientStorageSize = Gigabytes((u64)4);
             Memory.TransientStorage
                 = VirtualAlloc(0, Memory.TransientStorageSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 
@@ -802,7 +804,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                     bool SoundIsValid = false;
                     win32_sound_output SoundOutput = {};
                     SoundOutput.SamplesPerSec = 44100;
-                    SoundOutput.BytesPerSample = 2 * sizeof(int16);
+                    SoundOutput.BytesPerSample = 2 * sizeof(s16);
                     SoundOutput.BufferSize = SoundOutput.SamplesPerSec * SoundOutput.BytesPerSample;
                     SoundOutput.LatencySampleCount = SoundOutput.SamplesPerSec / 15;
                     SoundOutput.SafetyBytes
@@ -929,7 +931,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                             game_sound_buffer SoundBuffer = {};
                             // TODO(joe): We should only need to allocate this block of memory once instead
                             // of on every frame.
-                            SoundBuffer.Samples = (int16 *)VirtualAlloc(0, SoundOutput.BufferSize,
+                            SoundBuffer.Samples = (s16 *)VirtualAlloc(0, SoundOutput.BufferSize,
                                                                         MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
                             SoundBuffer.SampleCount = BytesToWrite / SoundOutput.BytesPerSample;
                             SoundBuffer.ToneVolume = SoundOutput.ToneVolume;

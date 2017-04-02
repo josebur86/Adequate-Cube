@@ -7,12 +7,12 @@
 // Rendering
 //
 
-static void ClearBuffer(game_back_buffer *BackBuffer, uint8 R, uint8 G, uint8 B)
+static void ClearBuffer(game_back_buffer *BackBuffer, u8 R, u8 G, u8 B)
 {
-    int8 *Row = (int8 *)BackBuffer->Memory;
+    s8 *Row = (s8 *)BackBuffer->Memory;
     for (int YIndex = 0; YIndex < BackBuffer->Height; ++YIndex)
     {
-        int32 *Pixel = (int32 *)Row;
+        s32 *Pixel = (s32 *)Row;
         for (int XIndex = 0; XIndex < BackBuffer->Width; ++XIndex)
         {
             *Pixel++ = (R << 16) | (G << 8) | (B << 0);
@@ -22,11 +22,11 @@ static void ClearBuffer(game_back_buffer *BackBuffer, uint8 R, uint8 G, uint8 B)
     }
 }
 
-static void DrawRectangle(game_back_buffer *BackBuffer, int X, int Y, int Width, int Height, uint8 R, uint8 G, uint8 B)
+static void DrawRectangle(game_back_buffer *BackBuffer, int X, int Y, int Width, int Height, u8 R, u8 G, u8 B)
 {
     for (int YIndex = 0; YIndex < Height; ++YIndex)
     {
-        uint32 *Pixel = (uint32 *)BackBuffer->Memory + ((Y + YIndex) * BackBuffer->Width) + X;
+        u32 *Pixel = (u32 *)BackBuffer->Memory + ((Y + YIndex) * BackBuffer->Width) + X;
         for (int XIndex = 0; XIndex < Width; ++XIndex)
         {
             if (X + XIndex < BackBuffer->Width && X + XIndex >= 0 && Y + YIndex < BackBuffer->Height && Y + YIndex >= 0)
@@ -54,7 +54,7 @@ static void DrawBitmap(game_back_buffer *BackBuffer, s32 X, s32 Y, loaded_bitmap
                 Y + RowIndex < BackBuffer->Height && Y + RowIndex >= 0)
             {
                 r32 SA = ((r32)((*SourcePixel >> 24) & 0xFF) / 255.0f);
-                r32 DA = 1.0f - SA; //(SA > 0.0f) ? 1.0f / SA : 1.0f;
+                r32 DA = 1.0f - SA;
 
                 u8 SR = ((*SourcePixel >> 0)  & 0xFF);
                 u8 SG = ((*SourcePixel >> 8)  & 0xFF);
@@ -186,11 +186,11 @@ extern "C" GET_SOUND_SAMPLES(GetSoundSamples)
 
     float WavePeriod = (float)SoundBuffer->SamplesPerSec / GameState->ToneHz;
 
-    int16 *Sample = SoundBuffer->Samples;
+    s16 *Sample = SoundBuffer->Samples;
     for (int SampleIndex = 0; SampleIndex < SoundBuffer->SampleCount; ++SampleIndex)
     {
         float SineValue = sinf(tSine);
-        uint16 ToneValue = (uint16)(SoundBuffer->ToneVolume * SineValue);
+        u16 ToneValue = (u16)(SoundBuffer->ToneVolume * SineValue);
 
         *Sample++ = ToneValue; // Left
         *Sample++ = ToneValue; // Right
