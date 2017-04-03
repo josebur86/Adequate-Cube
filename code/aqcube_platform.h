@@ -86,8 +86,14 @@ struct font_glyph
 {
     bool IsLoaded;
     loaded_bitmap Glyph;
+    u32 Baseline;
+    s32 Top;
+    s32 Bottom;
+    s32 ToLeftEdge;
+    s32 AdvanceWidth;
 };
-typedef loaded_bitmap debug_load_font_glyph(arena *Arena, char C);
+typedef font_glyph debug_load_font_glyph(arena *Arena, char C);
+typedef s32 debug_get_font_kern_advance_for(char A, char B);
 
 // Note(joe): These are services to the platform layer provided by the game.
 typedef struct game_memory
@@ -100,6 +106,7 @@ typedef struct game_memory
     // TODO(joe): Add function pointers when we need access to the platform specific services from the game.
     debug_load_bitmap *DEBUGLoadBitmap;
     debug_load_font_glyph *DEBUGLoadFontGlyph;
+    debug_get_font_kern_advance_for *DEBUGGetFontKernAdvanceFor;
 
     bool IsInitialized;
 } game_memory;

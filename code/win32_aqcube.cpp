@@ -27,6 +27,11 @@ struct font_data
 {
     bool IsLoaded;
     stbtt_fontinfo FontInfo;
+
+    r32 Scale;
+    s32 Ascent;  // NOTE(joe): Coordinate above the baseline the font extends.
+    s32 Descent; // NOTE(joe): Coorindate below the baseline the font exenteds (Typically negative). 
+    s32 LineGap; // NOTE(joe): Spacing between one row's descent and the next row's ascent.
 };
 static font_data GlobalDebugFont;
 
@@ -40,6 +45,9 @@ static font_data Win32InitFont(char *FontFileName)
     {
         Result.IsLoaded = true;
         stbtt_InitFont(&Result.FontInfo, (u8 *)FontFile.Contents, stbtt_GetFontOffsetForIndex((u8 *)FontFile.Contents, 0));
+
+        Result.Scale = stbtt_ScaleForPixelHeight(&Result.FontInfo, 80);
+        stbtt_GetFontVMetrics(&Result.FontInfo, &Result.Ascent, &Result.Descent, &Result.LineGap);
     }
 
     return Result;
@@ -336,48 +344,75 @@ static loaded_bitmap DEBUGLoadBitmap(arena *Arena, char *FileName)
     return Result;
 }
 
-static loaded_bitmap DEBUGLoadFontGlyph(arena *Arena, char C)
+static font_glyph DEBUGLoadFontGlyph(arena *Arena, char C)
 {
     Assert(GlobalDebugFont.IsLoaded);
 
-    loaded_bitmap Result = {};
+    font_glyph Result = {};
 
-    r32 FontScale = 80.0f;
     s32 FontWidth;
     s32 FontHeight;
-
     u8 *Bitmap = stbtt_GetCodepointBitmap(&GlobalDebugFont.FontInfo, 
                                           0, 
-                                          stbtt_ScaleForPixelHeight(&GlobalDebugFont.FontInfo, FontScale), 
+                                          GlobalDebugFont.Scale,
                                           C, 
                                           &FontWidth, 
                                           &FontHeight, 0, 0);
     Assert(Bitmap);
 
-    Result.IsValid = true;
-    Result.Width = FontWidth;
-    Result.Height = FontHeight;
-    Result.Pitch = FontWidth*4;
-
+    Result.Glyph.IsValid = true;
+    Result.Glyph.Width = FontWidth;
+    Result.Glyph.Height = FontHeight;
+    Result.Glyph.Pitch = FontWidth*4;
+    
     u32 BufferSize = (u32)FontWidth*FontHeight*4;
-    Result.Pixels = (u8 *)PushSize(Arena, BufferSize);
+    Result.Glyph.Pixels = (u8 *)PushSize(Arena, BufferSize);
+    Result.IsLoaded = true;
 
     u8 *Source = Bitmap;
-    u32 *Pixel = (u32 *)Result.Pixels;
+    u32 *Pixel = (u32 *)Result.Glyph.Pixels;
     for (u32 Index = 0; Index < BufferSize; ++Index)
     {
         u8 R = *Source;
         u8 G = *Source;
         u8 B = *Source;
-        u8 A = (R > 0) ? 0xFF : 0X00;
+        u8 A = *Source;
         *Pixel = (A << 24) | (R << 16) | (G << 8) | (B << 0);
 
         ++Source;
         ++Pixel;
     }
 
+    stbtt_FreeBitmap(Bitmap, 0);
+
+
+    s32 X0;
+    s32 X1;
+    s32 Y0;
+    s32 Y1;
+    stbtt_GetCodepointBitmapBox(&GlobalDebugFont.FontInfo,
+                                C,
+                                GlobalDebugFont.Scale, GlobalDebugFont.Scale,
+                                &X0, &Y0, &X1, &Y1);
+
+    s32 AdvanceWidth;
+    s32 LeftSideBearing;
+    stbtt_GetCodepointHMetrics(&GlobalDebugFont.FontInfo, C, &AdvanceWidth, &LeftSideBearing);
+
+    Result.Baseline = (s32)(GlobalDebugFont.Scale * GlobalDebugFont.Ascent);
+    Result.Top = Y0;
+    Result.Bottom = Y1;
+    Result.AdvanceWidth = (s32)(GlobalDebugFont.Scale * AdvanceWidth);
+    Result.ToLeftEdge = (s32)(GlobalDebugFont.Scale * LeftSideBearing);
+    
     return Result;
 };
+
+static s32 DEBUGGetFontKernAdvanceFor(char A, char B)
+{
+    s32 Result = (s32)(GlobalDebugFont.Scale * stbtt_GetCodepointKernAdvance(&GlobalDebugFont.FontInfo, A, B));
+    return Result;
+}
 
 static bool GlobalRunning = true;
 
@@ -820,7 +855,8 @@ static r32 NormalizeControllerAxis(s32 Value, s32 Center, s32 DeadZone)
 int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLine, int ShowCode)
 {
     Win32LoadDirectInput();
-    GlobalDebugFont = Win32InitFont("C:/Windows/Fonts/SourceCodePro-Regular.ttf");
+    //GlobalDebugFont = Win32InitFont("C:/Windows/Fonts/SourceCodePro-Regular.ttf");
+    GlobalDebugFont = Win32InitFont("C:/Windows/Fonts/arial.ttf");
 
     WNDCLASSA WindowClass = {};
     WindowClass.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
@@ -848,6 +884,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
 
             Memory.DEBUGLoadBitmap = DEBUGLoadBitmap;
             Memory.DEBUGLoadFontGlyph = DEBUGLoadFontGlyph;
+            Memory.DEBUGGetFontKernAdvanceFor = DEBUGGetFontKernAdvanceFor;
 
             char GameDLLFileName[] = "../build/aqcube.dll";
             char GameTempDLLFileName[] = "../build/aqcube_temp.dll";

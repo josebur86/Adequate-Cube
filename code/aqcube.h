@@ -31,6 +31,7 @@ struct platform
 {
     debug_load_bitmap *DEBUGLoadBitmap;
     debug_load_font_glyph *DEBUGLoadFontGlyph;
+    debug_get_font_kern_advance_for *DEBUGGetFontKernAdvanceFor;
 };
 
 //

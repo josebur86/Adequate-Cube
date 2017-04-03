@@ -85,18 +85,26 @@ static font_glyph * GetFontGlyphFor(game_state *GameState, char C)
     font_glyph *Glyph = GameState->FontGlyphs + (C - 32);
     if (!Glyph->IsLoaded)
     {
-        Glyph->Glyph = GameState->Platform.DEBUGLoadFontGlyph(&GameState->Arena, C);
+        *Glyph = GameState->Platform.DEBUGLoadFontGlyph(&GameState->Arena, C);
         Assert(Glyph->Glyph.IsValid);
         Glyph->IsLoaded = true;
     }
 
     return Glyph;
 }
+static s32 GetFontKernAdvanceFor(game_state *GameState, char A, char B)
+{
+    // TODO(joe): I would rather access the kerning table directly than have
+    // to ask the platform layer for it, but this is debug code so...
+    s32 Result = GameState->Platform.DEBUGGetFontKernAdvanceFor(A , B);
+    return Result;
+}
 
 static u32 AtX = 10;
 static u32 AtY = 10;
 
-static void DEBUGDrawLine(game_back_buffer *BackBuffer, game_state *GameState, char *Text)
+// TODO(joe): Multiple Fonts?.
+static void DEBUGDrawTextLine(game_back_buffer *BackBuffer, game_state *GameState, char *Text)
 {
     while(Text && *Text != '\0')
     {
@@ -105,18 +113,27 @@ static void DEBUGDrawLine(game_back_buffer *BackBuffer, game_state *GameState, c
             font_glyph *Glyph = GetFontGlyphFor(GameState, *Text);
             Assert(Glyph->IsLoaded);
 
-            DrawBitmap(BackBuffer, AtX, AtY, Glyph->Glyph);
-            AtX += Glyph->Glyph.Width;
+            u32 Y = AtY + Glyph->Baseline + Glyph->Top;
+            u32 X = AtX + Glyph->ToLeftEdge;
+            DrawBitmap(BackBuffer, AtX, Y, Glyph->Glyph);
+            AtX += Glyph->AdvanceWidth;
+            if (*(Text + 1) != '\0')
+            {
+                AtX += GetFontKernAdvanceFor(GameState, *Text, *(Text+1));
+            }
         }
         else
         {
+            // TODO(joe): Should we still produce a glyph just without a bitmap so that we can get
+            // the the glyph width information?
             AtX += 30;
         }
 
         ++Text;
     }
 
-    AtY += 20;
+    AtX = 10;
+    AtY += 80; // TODO(joe): Proper line advance.
 }
 
 static void Render(game_back_buffer *BackBuffer, game_state *GameState)
@@ -129,7 +146,12 @@ static void Render(game_back_buffer *BackBuffer, game_state *GameState)
     entity Ship = GameState->Ship;
     DrawBitmap(BackBuffer, (s32)Ship.P.X, (s32)Ship.P.Y, GameState->ShipBitmap);
 
-    DEBUGDrawLine(BackBuffer, GameState, "Adequate Cube");
+    DEBUGDrawTextLine(BackBuffer, GameState, "AT AV AW AY Av Aw Ay");
+    DEBUGDrawTextLine(BackBuffer, GameState, "Fa Fe Fo Kv Kw Ky LO");
+    DEBUGDrawTextLine(BackBuffer, GameState, "LV LY PA Pa Pe Po TA");
+    DEBUGDrawTextLine(BackBuffer, GameState, "Ta Te Ti To Tr Ts Tu Ty");
+    DEBUGDrawTextLine(BackBuffer, GameState, "UA VA Va Ve Vo Vr Vu Vy");
+    DEBUGDrawTextLine(BackBuffer, GameState, "WA WO Wa We Wr Wv Wy");
 }
 
 extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
@@ -139,6 +161,7 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
     {
         GameState->Platform.DEBUGLoadBitmap = Memory->DEBUGLoadBitmap;
         GameState->Platform.DEBUGLoadFontGlyph = Memory->DEBUGLoadFontGlyph;
+        GameState->Platform.DEBUGGetFontKernAdvanceFor = Memory->DEBUGGetFontKernAdvanceFor;
 
         GameState->Arena = InitializeArena((u64)((u8 *)Memory->PermanentStorage + sizeof(*GameState)), Gigabytes(1));
 
