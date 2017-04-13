@@ -1,16 +1,72 @@
-#include "SDL2/SDL.h"
+#include "include/SDL2/SDL.h"
 
 #include <assert.h>
 #include <dlfcn.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #include "../aqcube_platform.h" // TODO(joe): I'm not sure if I like that this is needed.
+#include "../aqcube_platform.cpp"
+#include "../aqcube.h"
 
-uint64 GlobalTimerFreq;
+u64 GlobalTimerFreq;
 bool GlobalRunning = true;
+
+//
+// File Read
+//
+static read_file_result DEBUGOSXReadFile(char *FileName)
+{
+    read_file_result Result = {};
+
+    s32 File = open(FileName, O_RDONLY);
+    if (File != -1)
+    {
+        struct stat FileStat = {};
+        s32 StatResult = fstat(File, &FileStat);
+        Assert(StatResult == 0);
+
+        Result.SizeInBytes = FileStat.st_size;
+        Result.Contents = mmap(0, 
+                               Result.SizeInBytes, 
+                               PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+        ssize_t BytesRead = read(File, Result.Contents, Result.SizeInBytes);
+        Assert(BytesRead == Result.SizeInBytes);
+
+        close(File);
+    }
+
+    return Result;
+}
+
+//
+// Font Init
+//
+
+static font_data OSXInitFont(char *FontFileName)
+{
+    font_data Result = {};
+
+    read_file_result FontFile = DEBUGOSXReadFile(FontFileName);
+    if (FontFile.Contents)
+    {
+        Result.IsLoaded = true;
+        stbtt_InitFont(&Result.FontInfo, 
+                       (u8 *)FontFile.Contents, 
+                       stbtt_GetFontOffsetForIndex((u8 *)FontFile.Contents, 0));
+
+        Result.Scale = stbtt_ScaleForPixelHeight(&Result.FontInfo, 80);
+        stbtt_GetFontVMetrics(&Result.FontInfo, &Result.Ascent, &Result.Descent, &Result.LineGap);
+    }
+    
+    // TODO(joe): Close the read file result.
+
+    return Result;
+}
 
 ///
 /// Controller Input
@@ -34,41 +90,53 @@ static SDL_GameController *OSX_InitController()
     return Result;
 }
 
-static void OSX_ProcessButtonState(button_state *Button, bool IsDown)
+static void OSX_ProcessButtonState(controller_button_state *Button, bool IsDown)
 {
     assert(Button->IsDown != IsDown);
     Button->IsDown = IsDown;
 }
 
-static void OSX_ProcessGameController(SDL_GameController *Controller, game_controller_input *Input)
+static void OSX_ProcessGameController(SDL_GameController *Controller, game_input *Input)
 {
-    bool IsDown = (SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_UP) == 1);
-    if (Input->Up.IsDown != IsDown)
-    {
-        OSX_ProcessButtonState(&Input->Up, IsDown);
-    }
+    // TODO(joe): Get analog stick data.
+    game_controller *AnalogController = Input->Controllers + 1;
+    AnalogController->IsAnalog = true;
 
-    IsDown = (SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN) == 1);
-    if (Input->Down.IsDown != IsDown)
+    if (Controller)
     {
-        OSX_ProcessButtonState(&Input->Down, IsDown);
-    }
+        AnalogController->IsConnected = true;
 
-    IsDown = (SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT) == 1);
-    if (Input->Left.IsDown != IsDown)
-    {
-        OSX_ProcessButtonState(&Input->Left, IsDown);
-    }
+        bool IsDown = (SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_UP) == 1);
+        if (AnalogController->Up.IsDown != IsDown)
+        {
+            OSX_ProcessButtonState(&AnalogController->Up, IsDown);
+        }
 
-    IsDown = (SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT) == 1);
-    if (Input->Right.IsDown != IsDown)
-    {
-        OSX_ProcessButtonState(&Input->Right, IsDown);
+        IsDown = (SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN) == 1);
+        if (AnalogController->Down.IsDown != IsDown)
+        {
+            OSX_ProcessButtonState(&AnalogController->Down, IsDown);
+        }
+
+        IsDown = (SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT) == 1);
+        if (AnalogController->Left.IsDown != IsDown)
+        {
+            OSX_ProcessButtonState(&AnalogController->Left, IsDown);
+        }
+
+        IsDown = (SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT) == 1);
+        if (AnalogController->Right.IsDown != IsDown)
+        {
+            OSX_ProcessButtonState(&AnalogController->Right, IsDown);
+        }
     }
 }
 
-static void OSX_ProcessInput(game_controller_input *Input)
+static void OSX_ProcessInput(game_input *Input)
 {
+    game_controller *KeyboardController = Input->Controllers;
+    KeyboardController->IsConnected = true;
+
     SDL_Event Event;
     while (SDL_PollEvent(&Event))
     {
@@ -79,7 +147,8 @@ static void OSX_ProcessInput(game_controller_input *Input)
             GlobalRunning = false;
         }
         break;
-#if 0
+
+#if 1
         case SDL_KEYDOWN:
         {
             if (!Event.key.repeat)
@@ -87,23 +156,22 @@ static void OSX_ProcessInput(game_controller_input *Input)
                 SDL_Keycode KeyCode = Event.key.keysym.sym;
                 if (KeyCode == SDLK_w)
                 {
-                    OSX_ProcessButtonState(&Input->Up, true);
+                    OSX_ProcessButtonState(&KeyboardController->Up, true);
                 }
                 else if (KeyCode == SDLK_s)
                 {
-                    OSX_ProcessButtonState(&Input->Down, true);
+                    OSX_ProcessButtonState(&KeyboardController->Down, true);
                 }
                 else if (KeyCode == SDLK_a)
                 {
-                    OSX_ProcessButtonState(&Input->Left, true);
+                    OSX_ProcessButtonState(&KeyboardController->Left, true);
                 }
                 else if (KeyCode == SDLK_d)
                 {
-                    OSX_ProcessButtonState(&Input->Right, true);
+                    OSX_ProcessButtonState(&KeyboardController->Right, true);
                 }
             }
-        }
-        break;
+        } break;
         case SDL_KEYUP:
         {
             if (!Event.key.repeat)
@@ -111,19 +179,19 @@ static void OSX_ProcessInput(game_controller_input *Input)
                 SDL_Keycode KeyCode = Event.key.keysym.sym;
                 if (KeyCode == SDLK_w)
                 {
-                    OSX_ProcessButtonState(&Input->Up, false);
+                    OSX_ProcessButtonState(&KeyboardController->Up, false);
                 }
                 else if (KeyCode == SDLK_s)
                 {
-                    OSX_ProcessButtonState(&Input->Down, false);
+                    OSX_ProcessButtonState(&KeyboardController->Down, false);
                 }
                 else if (KeyCode == SDLK_a)
                 {
-                    OSX_ProcessButtonState(&Input->Left, false);
+                    OSX_ProcessButtonState(&KeyboardController->Left, false);
                 }
                 else if (KeyCode == SDLK_d)
                 {
-                    OSX_ProcessButtonState(&Input->Right, false);
+                    OSX_ProcessButtonState(&KeyboardController->Right, false);
                 }
             }
         }
@@ -133,7 +201,7 @@ static void OSX_ProcessInput(game_controller_input *Input)
     }
 }
 
-static float OSX_GetElapsedSeconds(uint64 Start, uint64 End)
+static float OSX_GetElapsedSeconds(u64 Start, u64 End)
 {
     float Result = ((float)(End - Start)) / (float)GlobalTimerFreq;
 
@@ -198,6 +266,7 @@ int main(int argc, char **argv)
     }
 
     SDL_GameController *Controller = OSX_InitController();
+    GlobalDebugFont = OSXInitFont("/Library/Fonts/Arial.ttf");
 
     GlobalTimerFreq = SDL_GetPerformanceFrequency();
 
@@ -208,16 +277,20 @@ int main(int argc, char **argv)
         SDL_Surface *Surface = SDL_GetWindowSurface(Window);
         if (Surface)
         {
-            char GameFileName[] = "./libaqcube.so";
+            char GameFileName[] = "../build/libaqcube.so";
             game_code Game      = OSX_LoadGameCode(GameFileName);
 
             game_memory Memory          = {};
             Memory.PermanentStorageSize = Megabytes(64);
             Memory.PermanentStorage
                 = mmap(0, Memory.PermanentStorageSize, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
-            Memory.TransientStorageSize = Gigabytes((uint64)4);
+            Memory.TransientStorageSize = Gigabytes((u64)4);
             Memory.TransientStorage
                 = mmap(0, Memory.TransientStorageSize, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+
+            Memory.DEBUGLoadBitmap = DEBUGLoadBitmap;
+            Memory.DEBUGLoadFontGlyph = DEBUGLoadFontGlyph;
+            Memory.DEBUGGetFontKernAdvanceFor = DEBUGGetFontKernAdvanceFor;
 
             if (Memory.PermanentStorage && Memory.TransientStorage)
             {
@@ -232,9 +305,9 @@ int main(int argc, char **argv)
                 int GameUpdateHz         = MonitorHz / 2;
                 float TargetFrameSeconds = 1.0f / (float)GameUpdateHz;
 
-                game_controller_input Input = {};
+                game_input Input = {};
 
-                uint64 LastFrameCount = SDL_GetPerformanceCounter();
+                u64 LastFrameCount = SDL_GetPerformanceCounter();
                 while (GlobalRunning)
                 {
                     if (Game.WriteTime != OSX_GetLastWriteTime(GameFileName))
@@ -254,11 +327,11 @@ int main(int argc, char **argv)
                         Game.UpdateGameAndRender(&Memory, &BackBuffer, &Input);
                     }
 
-                    uint64 FrameCount = SDL_GetPerformanceCounter();
+                    u64 FrameCount = SDL_GetPerformanceCounter();
                     float ElapsedTime = OSX_GetElapsedSeconds(LastFrameCount, FrameCount);
                     if (ElapsedTime < TargetFrameSeconds)
                     {
-                        uint32 TimeToSleep = (uint32)(1000.0f * (TargetFrameSeconds - ElapsedTime));
+                        u32 TimeToSleep = (u32)(1000.0f * (TargetFrameSeconds - ElapsedTime));
                         if (TimeToSleep > 0)
                         {
                             SDL_Delay(TimeToSleep);
@@ -275,7 +348,7 @@ int main(int argc, char **argv)
                         // TODO(joe): Log that we missed a frame.
                     }
 
-                    uint64 EndCount = SDL_GetPerformanceCounter();
+                    u64 EndCount = SDL_GetPerformanceCounter();
 #if 0
                     float MSPerFrame = 1000.0f * OSX_GetElapsedSeconds(LastFrameCount, EndCount);
                     float FPS = 1000.0f / MSPerFrame;

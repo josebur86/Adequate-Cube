@@ -83,7 +83,7 @@ static void DrawBitmap(game_back_buffer *BackBuffer, s32 X, s32 Y, loaded_bitmap
 static font_glyph * GetFontGlyphFor(game_state *GameState, char C)
 {
     font_glyph *Glyph = GameState->FontGlyphs + (C - 32);
-    if (!Glyph->IsLoaded)
+    if (!Glyph->IsLoaded && GameState->Platform.DEBUGLoadFontGlyph)
     {
         *Glyph = GameState->Platform.DEBUGLoadFontGlyph(&GameState->Arena, C);
         Assert(Glyph->Glyph.IsValid);
@@ -144,14 +144,19 @@ static void Render(game_back_buffer *BackBuffer, game_state *GameState)
     ClearBuffer(BackBuffer, 0, 43, 54);
 
     entity Ship = GameState->Ship;
-    DrawBitmap(BackBuffer, (s32)Ship.P.X, (s32)Ship.P.Y, GameState->ShipBitmap);
+    if (GameState->ShipBitmap.IsValid)
+    {
+        DrawBitmap(BackBuffer, (s32)Ship.P.X, (s32)Ship.P.Y, GameState->ShipBitmap);
+    }
 
+#if 1
     DEBUGDrawTextLine(BackBuffer, GameState, "AT AV AW AY Av Aw Ay");
     DEBUGDrawTextLine(BackBuffer, GameState, "Fa Fe Fo Kv Kw Ky LO");
     DEBUGDrawTextLine(BackBuffer, GameState, "LV LY PA Pa Pe Po TA");
     DEBUGDrawTextLine(BackBuffer, GameState, "Ta Te Ti To Tr Ts Tu Ty");
     DEBUGDrawTextLine(BackBuffer, GameState, "UA VA Va Ve Vo Vr Vu Vy");
     DEBUGDrawTextLine(BackBuffer, GameState, "WA WO Wa We Wr Wv Wy");
+#endif
 }
 
 extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
@@ -170,7 +175,10 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
         GameState->Ship.Size.X = 80.0f;
         GameState->Ship.Size.Y = 40.0f;
 
-        GameState->ShipBitmap = GameState->Platform.DEBUGLoadBitmap(&GameState->Arena, "Ship-1.png");
+        if (GameState->Platform.DEBUGLoadBitmap)
+        {
+            GameState->ShipBitmap = GameState->Platform.DEBUGLoadBitmap(&GameState->Arena, "Ship-1.png");
+        }
 
         GameState->ToneHz = 256;
 
