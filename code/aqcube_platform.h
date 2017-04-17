@@ -128,7 +128,7 @@ typedef struct game_sound_buffer
 } game_sound_buffer;
 
 struct game_input;
-#define UPDATE_GAME_AND_RENDER(name) void (name)(game_memory *Memory, game_back_buffer *BackBuffer, game_input *Input)
+#define UPDATE_GAME_AND_RENDER(name) void (name)(game_memory *Memory, game_back_buffer *BackBuffer, game_input *Input, r32 LastFrameTime)
 typedef UPDATE_GAME_AND_RENDER(update_game_and_render);
 
 #define GET_SOUND_SAMPLES(name) void (name)(game_sound_buffer *SoundBuffer, game_memory *Memory)

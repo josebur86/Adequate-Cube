@@ -76,40 +76,44 @@ static font_glyph DEBUGLoadFontGlyph(arena *Arena, char C)
 
     font_glyph Result = {};
 
-    s32 FontWidth;
-    s32 FontHeight;
-    u8 *Bitmap = stbtt_GetCodepointBitmap(&GlobalDebugFont.FontInfo, 
-                                          0, 
-                                          GlobalDebugFont.Scale,
-                                          C, 
-                                          &FontWidth, 
-                                          &FontHeight, 0, 0);
-    Assert(Bitmap);
-
-    Result.Glyph.IsValid = true;
-    Result.Glyph.Width = FontWidth;
-    Result.Glyph.Height = FontHeight;
-    Result.Glyph.Pitch = FontWidth*4;
-    
-    u32 BufferSize = (u32)FontWidth*FontHeight*4;
-    Result.Glyph.Pixels = (u8 *)PushSize(Arena, BufferSize);
     Result.IsLoaded = true;
+    Result.Glyph.IsValid = true;
 
-    u8 *Source = Bitmap;
-    u32 *Pixel = (u32 *)Result.Glyph.Pixels;
-    for (u32 Index = 0; Index < BufferSize; ++Index)
+    if (C != ' ')
     {
-        u8 R = *Source;
-        u8 G = *Source;
-        u8 B = *Source;
-        u8 A = *Source;
-        *Pixel = (A << 24) | (R << 16) | (G << 8) | (B << 0);
+        s32 FontWidth;
+        s32 FontHeight;
+        u8 *Bitmap = stbtt_GetCodepointBitmap(&GlobalDebugFont.FontInfo, 
+                0, 
+                GlobalDebugFont.Scale,
+                C, 
+                &FontWidth, 
+                &FontHeight, 0, 0);
 
-        ++Source;
-        ++Pixel;
+        Result.Glyph.Width = FontWidth;
+        Result.Glyph.Height = FontHeight;
+        Result.Glyph.Pitch = FontWidth*4;
+    
+        u32 BufferSize = (u32)FontWidth*FontHeight*4;
+        Result.Glyph.Pixels = (u8 *)PushSize(Arena, BufferSize);
+
+        Assert(Bitmap);
+        u8 *Source = Bitmap;
+        u32 *Pixel = (u32 *)Result.Glyph.Pixels;
+        for (u32 Index = 0; Index < BufferSize; ++Index)
+        {
+            u8 R = *Source;
+            u8 G = *Source;
+            u8 B = *Source;
+            u8 A = *Source;
+            *Pixel = (A << 24) | (R << 16) | (G << 8) | (B << 0);
+
+            ++Source;
+            ++Pixel;
+        }
+
+        stbtt_FreeBitmap(Bitmap, 0);
     }
-
-    stbtt_FreeBitmap(Bitmap, 0);
 
 
     s32 X0;

@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <math.h>
+#include <stdio.h>
 
 //
 // Rendering
@@ -108,26 +109,19 @@ static void DEBUGDrawTextLine(game_back_buffer *BackBuffer, game_state *GameStat
 {
     while(Text && *Text != '\0')
     {
-        if (*Text != ' ')
-        {
-            font_glyph *Glyph = GetFontGlyphFor(GameState, *Text);
-            Assert(Glyph->IsLoaded);
+        font_glyph *Glyph = GetFontGlyphFor(GameState, *Text);
+        Assert(Glyph->IsLoaded);
 
-            u32 Y = AtY + Glyph->Baseline + Glyph->Top;
-            u32 X = AtX + Glyph->ToLeftEdge;
-            DrawBitmap(BackBuffer, AtX, Y, Glyph->Glyph);
-            AtX += Glyph->AdvanceWidth;
-            if (*(Text + 1) != '\0')
-            {
-                AtX += GetFontKernAdvanceFor(GameState, *Text, *(Text+1));
-            }
-        }
-        else
+        u32 Y = AtY + Glyph->Baseline + Glyph->Top;
+        u32 X = AtX + Glyph->ToLeftEdge;
+        DrawBitmap(BackBuffer, AtX, Y, Glyph->Glyph);
+        AtX += Glyph->AdvanceWidth;
+#if 1
+        if ((Text + 1) && *(Text + 1) != '\0')
         {
-            // TODO(joe): Should we still produce a glyph just without a bitmap so that we can get
-            // the the glyph width information?
-            AtX += 30;
+            AtX += GetFontKernAdvanceFor(GameState, *Text, *(Text+1));
         }
+#endif
 
         ++Text;
     }
@@ -136,7 +130,7 @@ static void DEBUGDrawTextLine(game_back_buffer *BackBuffer, game_state *GameStat
     AtY += 80; // TODO(joe): Proper line advance.
 }
 
-static void Render(game_back_buffer *BackBuffer, game_state *GameState)
+static void Render(game_back_buffer *BackBuffer, game_state *GameState, r32 LastFrameTime)
 {
     AtX = 10;
     AtY = 10;
@@ -149,14 +143,9 @@ static void Render(game_back_buffer *BackBuffer, game_state *GameState)
         DrawBitmap(BackBuffer, (s32)Ship.P.X, (s32)Ship.P.Y, GameState->ShipBitmap);
     }
 
-#if 1
-    DEBUGDrawTextLine(BackBuffer, GameState, "AT AV AW AY Av Aw Ay");
-    DEBUGDrawTextLine(BackBuffer, GameState, "Fa Fe Fo Kv Kw Ky LO");
-    DEBUGDrawTextLine(BackBuffer, GameState, "LV LY PA Pa Pe Po TA");
-    DEBUGDrawTextLine(BackBuffer, GameState, "Ta Te Ti To Tr Ts Tu Ty");
-    DEBUGDrawTextLine(BackBuffer, GameState, "UA VA Va Ve Vo Vr Vu Vy");
-    DEBUGDrawTextLine(BackBuffer, GameState, "WA WO Wa We Wr Wv Wy");
-#endif
+    char Buffer[256];
+    sprintf(Buffer, "Last Frame Time: %.2fms", LastFrameTime);
+    DEBUGDrawTextLine(BackBuffer, GameState, Buffer);
 }
 
 extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
@@ -253,7 +242,7 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
         Ship->dP.Y = 0.0f;
     }
 
-    Render(BackBuffer, GameState);
+    Render(BackBuffer, GameState, LastFrameTime);
 }
 
 // TODO(joe): This function will need to be performant.

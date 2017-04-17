@@ -59,7 +59,7 @@ static font_data OSXInitFont(char *FontFileName)
                        (u8 *)FontFile.Contents, 
                        stbtt_GetFontOffsetForIndex((u8 *)FontFile.Contents, 0));
 
-        Result.Scale = stbtt_ScaleForPixelHeight(&Result.FontInfo, 80);
+        Result.Scale = stbtt_ScaleForPixelHeight(&Result.FontInfo, 24);
         stbtt_GetFontVMetrics(&Result.FontInfo, &Result.Ascent, &Result.Descent, &Result.LineGap);
     }
     
@@ -307,6 +307,7 @@ int main(int argc, char **argv)
 
                 game_input Input = {};
 
+                float LastFrameMS = 0.0f;
                 u64 LastFrameCount = SDL_GetPerformanceCounter();
                 while (GlobalRunning)
                 {
@@ -324,7 +325,7 @@ int main(int argc, char **argv)
 
                     if (Game.UpdateGameAndRender)
                     {
-                        Game.UpdateGameAndRender(&Memory, &BackBuffer, &Input);
+                        Game.UpdateGameAndRender(&Memory, &BackBuffer, &Input, LastFrameMS);
                     }
 
                     u64 FrameCount = SDL_GetPerformanceCounter();
@@ -349,11 +350,7 @@ int main(int argc, char **argv)
                     }
 
                     u64 EndCount = SDL_GetPerformanceCounter();
-#if 0
-                    float MSPerFrame = 1000.0f * OSX_GetElapsedSeconds(LastFrameCount, EndCount);
-                    float FPS = 1000.0f / MSPerFrame;
-                    printf("ms/f: %.2f f/s: %.2f \n", MSPerFrame, FPS);
-#endif
+                    LastFrameMS = 1000.0f * OSX_GetElapsedSeconds(LastFrameCount, EndCount);
                     LastFrameCount = EndCount;
 
                     SDL_UpdateWindowSurface(Window);
