@@ -138,14 +138,12 @@ static void Render(game_back_buffer *BackBuffer, game_state *GameState, r32 Last
     ClearBuffer(BackBuffer, 0, 43, 54);
 
     entity Ship = GameState->Ship;
-    if (GameState->ShipBitmap.IsValid)
-    {
-        DrawBitmap(BackBuffer, (s32)Ship.P.X, (s32)Ship.P.Y, GameState->ShipBitmap);
-    }
 
     char Buffer[256];
     sprintf_s(Buffer, "Last Frame Time: %.2fms", LastFrameTime);
     DEBUGDrawTextLine(BackBuffer, GameState, Buffer);
+
+    DrawBitmap(BackBuffer, (s32)Ship.P.X, (s32)Ship.P.Y, GameState->ShipBitmap);
 }
 
 extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
