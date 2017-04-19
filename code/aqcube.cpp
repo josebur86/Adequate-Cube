@@ -144,7 +144,7 @@ static void Render(game_back_buffer *BackBuffer, game_state *GameState, r32 Last
     }
 
     char Buffer[256];
-    sprintf(Buffer, "Last Frame Time: %.2fms", LastFrameTime);
+    sprintf_s(Buffer, "Last Frame Time: %.2fms", LastFrameTime);
     DEBUGDrawTextLine(BackBuffer, GameState, Buffer);
 }
 

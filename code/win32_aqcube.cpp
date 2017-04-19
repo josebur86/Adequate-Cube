@@ -22,7 +22,8 @@ static font_data Win32InitFont(char *FontFileName)
         Result.IsLoaded = true;
         stbtt_InitFont(&Result.FontInfo, (u8 *)FontFile.Contents, stbtt_GetFontOffsetForIndex((u8 *)FontFile.Contents, 0));
 
-        Result.Scale = stbtt_ScaleForPixelHeight(&Result.FontInfo, 80);
+        r32 FontScale = 20.0f;
+        Result.Scale = stbtt_ScaleForPixelHeight(&Result.FontInfo, FontScale);
         stbtt_GetFontVMetrics(&Result.FontInfo, &Result.Ascent, &Result.Descent, &Result.LineGap);
     }
 
@@ -785,6 +786,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                     game_controller *KeyboardController = NewInput->Controllers;
                     KeyboardController->IsConnected = true;
 
+                    r32 LastFrameTime = 0.0f;
                     LARGE_INTEGER LastFrameCount = Win32GetClock();
                     GlobalRunning = true;
                     while (GlobalRunning)
@@ -846,7 +848,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
 
                         if (Game.UpdateGameAndRender)
                         {
-                            Game.UpdateGameAndRender(&Memory, &BackBuffer, NewInput);
+                            Game.UpdateGameAndRender(&Memory, &BackBuffer, NewInput, LastFrameTime);
                         }
 
                         DWORD PlayCursor = 0;
@@ -949,13 +951,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
 
                         LARGE_INTEGER EndCount = Win32GetClock();
 
-#if 0
-                        char FrameTimeString[255];
-                        float MSPerFrame = 1000.0f * Win32GetElapsedSeconds(LastFrameCount, EndCount);
-                        float FPS        = 1000.0f / MSPerFrame;
-                        snprintf(FrameTimeString, 255, "ms/f: %.2f f/s: %.2f \n", MSPerFrame, FPS);
-                        OutputDebugStringA(FrameTimeString);
-#endif
+                        LastFrameTime = 1000.0f * Win32GetElapsedSeconds(LastFrameCount, EndCount);
                         LastFrameCount = EndCount;
 
                         Win32PaintBackBuffer(DeviceContext, &GlobalBackBuffer);
