@@ -3,7 +3,7 @@
 /*
  * TODO(joe):
  *  - Scrolling background
- *  - Up/down sprites
+ *  - Up/down ship sprites
  *
  *  - Power-Ups
  *      * Thing that follows your movements but can also shoot (familiar).
@@ -42,7 +42,7 @@ struct entity
     vector2 Size;
 
     vector2 P;
-    vector2 dP; // Unit Per Second
+    vector2 dP; // Meters Per Second
 };
 
 struct game_state
@@ -51,6 +51,7 @@ struct game_state
 
     entity Ship;
     loaded_bitmap ShipBitmap;
+    r32 PixelsPerMeter;
 
     font_glyph FontGlyphs[('~' - '!') + 1];
 

@@ -121,6 +121,22 @@ inline vector2 operator*(r32 A, vector2 B)
     return Result;
 }
 
+inline vector2 & operator*=(vector2 &A, vector2 B)
+{
+    A.X *= B.X;
+    A.Y *= B.Y;
+
+    return A;
+}
+
+inline vector2 & operator*=(vector2 &A, r32 B)
+{
+    A.X *= B;
+    A.Y *= B;
+
+    return A;
+}
+
 inline vector2 operator+(vector2 A, vector2 B)
 {
     vector2 Result { A.X + B.X, A.Y + B.Y };

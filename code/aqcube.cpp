@@ -143,7 +143,9 @@ static void Render(game_back_buffer *BackBuffer, game_state *GameState, r32 Last
     sprintf_s(Buffer, "Last Frame Time: %.2fms", LastFrameTime);
     DEBUGDrawTextLine(BackBuffer, GameState, Buffer);
 
-    DrawBitmap(BackBuffer, (s32)Ship.P.X, (s32)Ship.P.Y, GameState->ShipBitmap);
+    s32 ShipX = (s32)(Ship.P.X * GameState->PixelsPerMeter);
+    s32 ShipY = (s32)(Ship.P.Y * GameState->PixelsPerMeter);
+    DrawBitmap(BackBuffer, ShipX, ShipY, GameState->ShipBitmap);
 }
 
 extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
@@ -157,14 +159,24 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
 
         GameState->Arena = InitializeArena((u64)((u8 *)Memory->PermanentStorage + sizeof(*GameState)), Gigabytes(1));
 
-        GameState->Ship.P.X = (float)BackBuffer->Width / 8;
-        GameState->Ship.P.Y = (float)BackBuffer->Height / 2;
-        GameState->Ship.Size.X = 80.0f;
-        GameState->Ship.Size.Y = 40.0f;
+#if 1
+        GameState->PixelsPerMeter = 6.54f;
+#else
+        GameState->PixelsPerMeter = 14.37f;
+#endif
+        r32 MetersPerPixel = 1.0f / GameState->PixelsPerMeter;
+        GameState->Ship.P.X = MetersPerPixel * ((float)BackBuffer->Width / 8);
+        GameState->Ship.P.Y = MetersPerPixel * ((float)BackBuffer->Height / 2);
+        GameState->Ship.Size.X = 15.24f;
+        GameState->Ship.Size.Y = 4.87f;
 
         if (GameState->Platform.DEBUGLoadBitmap)
         {
             GameState->ShipBitmap = GameState->Platform.DEBUGLoadBitmap(&GameState->Arena, "Ship-1.png");
+        }
+        else
+        {
+            Assert(!"Platform cannot load bitmaps!");
         }
 
         GameState->ToneHz = 256;
@@ -212,13 +224,14 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
         }
     }
 
-    float ShipSpeed = 2000.0f; // pixels / sec^2
-    ddP = ddP * ShipSpeed; // TODO(joe): Overload *= for vectors
-    ddP = -5.0f * Ship->dP + ddP;
+    float ShipAccel = 600.0f; // meters / sec^2
+    ddP *= ShipAccel; 
+    ddP = -7.0f * Ship->dP + ddP;
 
     Ship->P = (0.5f * ddP * Square(Input->dt)) + (Ship->dP * Input->dt) + Ship->P;
     Ship->dP = (ddP * Input->dt) + Ship->dP;
 
+    // TODO(joe): Collision with the world instead of the screen.
     if (Ship->P.X < 0.0)
     {
         Ship->P.X = 0.0f;
