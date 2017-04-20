@@ -45,10 +45,16 @@ struct entity
     vector2 dP; // Meters Per Second
 };
 
+struct world
+{
+    rect Bounds;
+};
+
 struct game_state
 {
     arena Arena;
 
+    world World;
     entity Ship;
     loaded_bitmap ShipBitmap;
     r32 PixelsPerMeter;

@@ -29,7 +29,8 @@ union vector3
     };
 };
 
-union vector4 {
+union vector4 
+{
     struct
     {
         r32 X, Y, Z, W;
@@ -37,6 +38,22 @@ union vector4 {
     struct
     {
         r32 C0, C1, C2, C3;
+    };
+};
+
+union rect
+{
+    struct
+    {
+        vector2 TopLeft;
+        vector2 BottomRight;
+    };
+    struct
+    {
+        r32 Left;
+        r32 Top;
+        r32 Right;
+        r32 Bottom;
     };
 };
 
@@ -463,5 +480,27 @@ inline matrix44 LookAt(vector3 Position, vector3 Target, vector3 Up)
     Result.R1.C3    = Position.Y;
     Result.R2.C3    = Position.Z;
 
+    return Result;
+}
+
+//
+// Rectangle
+//
+
+inline rect Rect(vector2 TopLeft, vector2 BottomRight)
+{
+    rect Result = {TopLeft, BottomRight};
+    return Result;
+}
+
+inline r32 Width(rect R)
+{
+    r32 Result = R.Right - R.Left;
+    return Result;
+}
+
+inline r32 Height(rect R)
+{
+    r32 Result = R.Top - R.Bottom;
     return Result;
 }

@@ -164,9 +164,14 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
 #else
         GameState->PixelsPerMeter = 14.37f;
 #endif
+
         r32 MetersPerPixel = 1.0f / GameState->PixelsPerMeter;
-        GameState->Ship.P.X = MetersPerPixel * ((float)BackBuffer->Width / 8);
-        GameState->Ship.P.Y = MetersPerPixel * ((float)BackBuffer->Height / 2);
+        GameState->World.Bounds = Rect(V2(0.0f, 0.0f), 
+                                       V2((float)BackBuffer->Width * MetersPerPixel, 
+                                          (float)BackBuffer->Height * MetersPerPixel));
+
+        GameState->Ship.P.X = Width(GameState->World.Bounds) / 8.0f;
+        GameState->Ship.P.Y = Height(GameState->World.Bounds) / 2.0f;
         GameState->Ship.Size.X = 15.24f;
         GameState->Ship.Size.Y = 4.87f;
 
@@ -184,6 +189,7 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
         Memory->IsInitialized = true;
     }
 
+    world *World = &GameState->World;
     entity *Ship = &GameState->Ship;
 
     vector2 ddP = { 0.0f, 0.0f };
@@ -231,25 +237,24 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
     Ship->P = (0.5f * ddP * Square(Input->dt)) + (Ship->dP * Input->dt) + Ship->P;
     Ship->dP = (ddP * Input->dt) + Ship->dP;
 
-    // TODO(joe): Collision with the world instead of the screen.
-    if (Ship->P.X < 0.0)
+    if (Ship->P.X < World->Bounds.Left)
     {
         Ship->P.X = 0.0f;
         Ship->dP.X = 0.0f;
     }
-    if (Ship->P.Y < 0.0)
+    if (Ship->P.Y < World->Bounds.Top)
     {
         Ship->P.Y = 0.0f;
         Ship->dP.Y = 0.0f;
     }
-    if (Ship->P.X + Ship->Size.X >= BackBuffer->Width)
+    if (Ship->P.X >= World->Bounds.Right)
     {
-        Ship->P.X = BackBuffer->Width - Ship->Size.X - 1.0f;
+        Ship->P.X = World->Bounds.Right;
         Ship->dP.X = 0.0f;
     }
-    if (Ship->P.Y + Ship->Size.Y >= BackBuffer->Height)
+    if (Ship->P.Y >= World->Bounds.Bottom)
     {
-        Ship->P.Y = BackBuffer->Height - Ship->Size.Y - 1.0f;
+        Ship->P.Y = World->Bounds.Bottom;
         Ship->dP.Y = 0.0f;
     }
 
