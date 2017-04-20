@@ -41,6 +41,9 @@ static void DrawRectangle(game_back_buffer *BackBuffer, int X, int Y, int Width,
 
 static void DrawBitmap(game_back_buffer *BackBuffer, s32 X, s32 Y, loaded_bitmap Bitmap)
 {
+    X -= Bitmap.Width / 2;
+    Y -= Bitmap.Height / 2;
+
     u8 *SourceRow = Bitmap.Pixels;
     u8 *DestRow = (u8 *)((u32 *)BackBuffer->Memory + (Y * BackBuffer->Width) + X);
 
@@ -114,7 +117,7 @@ static void DEBUGDrawTextLine(game_back_buffer *BackBuffer, game_state *GameStat
 
         u32 Y = AtY + Glyph->Baseline + Glyph->Top;
         u32 X = AtX + Glyph->ToLeftEdge;
-        DrawBitmap(BackBuffer, AtX, Y, Glyph->Glyph);
+        DrawBitmap(BackBuffer, X + (Glyph->Glyph.Width / 2), Y + (Glyph->Glyph.Height / 2), Glyph->Glyph);
         AtX += Glyph->AdvanceWidth;
 #if 1
         if ((Text + 1) && *(Text + 1) != '\0')

@@ -501,6 +501,6 @@ inline r32 Width(rect R)
 
 inline r32 Height(rect R)
 {
-    r32 Result = R.Top - R.Bottom;
+    r32 Result = R.Bottom - R.Top;
     return Result;
 }
