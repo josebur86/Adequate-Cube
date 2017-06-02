@@ -31,7 +31,7 @@ del *.pdb > NUL 2> NUL
 echo "Compiling AQCube.dll" > lock.tmp
 cl %CompilerFlags% /LD ..\code\aqcube.cpp /link %LinkerFlags% /PDB:aqcube_%random%.pdb -export:UpdateGameAndRender -export:GetSoundSamples
 del lock.tmp
-cl %CompilerFlags% ..\code\win32_aqcube.cpp /link %LinkerFlags%
+cl %CompilerFlags% /I ..\code\third_party\GLAD\include ..\code\win32_aqcube.cpp /link %LinkerFlags%
 
 popd
 

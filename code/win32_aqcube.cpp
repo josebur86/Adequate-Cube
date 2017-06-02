@@ -6,6 +6,9 @@
 
 #include <stdio.h>
 
+#include <glad/glad.h>
+#include "third_party/GLAD/src/glad.c"
+
 #include "aqcube.h"
 #include "aqcube_platform.h"
 #include "aqcube_platform.cpp"
@@ -30,7 +33,6 @@ static font_data Win32InitFont(char *FontFileName)
 
     return Result;
 }
-
 
 struct win32_back_buffer
 {
@@ -521,6 +523,9 @@ static HGLRC InitOpenGL(HDC DeviceContext)
 
     Result = wglMakeCurrent(DeviceContext, GLContext);
     Assert(Result == TRUE);
+
+    int LoadGLResult = gladLoadGL();
+    Assert(LoadGLResult);
 
     return GLContext;
 }
