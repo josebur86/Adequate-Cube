@@ -142,13 +142,32 @@ static void Render(game_back_buffer *BackBuffer, game_state *GameState, r32 Last
 
     entity Ship = GameState->Ship;
 
-    char Buffer[256];
-    sprintf_s(Buffer, "Last Frame Time: %.2fms", LastFrameTime);
-    DEBUGDrawTextLine(BackBuffer, GameState, Buffer);
-
     s32 ShipX = (s32)(Ship.P.X * GameState->PixelsPerMeter);
     s32 ShipY = (s32)(Ship.P.Y * GameState->PixelsPerMeter);
     DrawBitmap(BackBuffer, ShipX, ShipY, GameState->ShipBitmap);
+
+    coordinate_system *Coord = &GameState->TestCoord;
+    vector2 Point = Coord->Origin;
+    DrawRectangle(BackBuffer, (s32)Point.X, (s32)Point.Y, 4, 4, 
+            u8(255.0f * Coord->Color.R), 
+            u8(255.0f * Coord->Color.G), 
+            u8(255.0f * Coord->Color.B));
+
+    Point = Coord->Origin + Coord->XAxis;
+    DrawRectangle(BackBuffer, (s32)Point.X, (s32)Point.Y, 4, 4, 
+            u8(255.0f * Coord->Color.R), 
+            u8(255.0f * Coord->Color.G), 
+            u8(255.0f * Coord->Color.B));
+
+    Point = Coord->Origin + Coord->YAxis;
+    DrawRectangle(BackBuffer, (s32)Point.X, (s32)Point.Y, 4, 4, 
+            u8(255.0f * Coord->Color.R), 
+            u8(255.0f * Coord->Color.G), 
+            u8(255.0f * Coord->Color.B));
+
+    char Buffer[256];
+    sprintf_s(Buffer, "Last Frame Time: %.2fms", LastFrameTime);
+    DEBUGDrawTextLine(BackBuffer, GameState, Buffer);
 }
 
 extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
@@ -162,12 +181,7 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
 
         GameState->Arena = InitializeArena((u64)((u8 *)Memory->PermanentStorage + sizeof(*GameState)), Gigabytes(1));
 
-#if 1
         GameState->PixelsPerMeter = 6.54f;
-#else
-        GameState->PixelsPerMeter = 14.37f;
-#endif
-
         r32 MetersPerPixel = 1.0f / GameState->PixelsPerMeter;
         GameState->World.Bounds = Rect(V2(0.0f, 0.0f), 
                                        V2((float)BackBuffer->Width * MetersPerPixel, 
@@ -189,6 +203,8 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
 
         GameState->ToneHz = 256;
 
+
+        
         Memory->IsInitialized = true;
     }
 
@@ -260,6 +276,13 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
         Ship->P.Y = World->Bounds.Bottom;
         Ship->dP.Y = 0.0f;
     }
+    
+    rect ScreenRect = Rect(V2(0, 0), V2(BackBuffer->Width, BackBuffer->Height));
+    GameState->Time += 100.0f * Input->dt;
+    GameState->TestCoord.Origin = Center(ScreenRect);
+    GameState->TestCoord.XAxis = 100.0f * V2(Cos(GameState->Time), Sin(GameState->Time));
+    GameState->TestCoord.YAxis = 2*V2(-GameState->TestCoord.XAxis.Y, GameState->TestCoord.XAxis.X);
+    GameState->TestCoord.Color= V4(1, 1, 0, 1);
 
     Render(BackBuffer, GameState, LastFrameTime);
 }

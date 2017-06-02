@@ -1,5 +1,8 @@
 @echo off
 
+REM Rebuild the Tags File
+ctags -R .
+
 setlocal
 
 REM Compiler Flags

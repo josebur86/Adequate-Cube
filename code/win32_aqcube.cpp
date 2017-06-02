@@ -716,8 +716,8 @@ static r32 NormalizeControllerAxis(s32 Value, s32 Center, s32 DeadZone)
 int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLine, int ShowCode)
 {
     Win32LoadDirectInput();
-    //GlobalDebugFont = Win32InitFont("C:/Windows/Fonts/SourceCodePro-Regular.ttf");
-    GlobalDebugFont = Win32InitFont("C:/Windows/Fonts/arial.ttf");
+    GlobalDebugFont = Win32InitFont("C:/Windows/Fonts/SourceCodePro-Regular.ttf");
+    //GlobalDebugFont = Win32InitFont("C:/Windows/Fonts/arial.ttf");
 
     WNDCLASSA WindowClass = {};
     WindowClass.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;

@@ -50,6 +50,14 @@ struct world
     rect Bounds;
 };
 
+struct coordinate_system
+{
+    vector2 Origin;
+    vector2 XAxis;
+    vector2 YAxis;
+    vector4 Color;
+};
+
 struct game_state
 {
     arena Arena;
@@ -60,6 +68,9 @@ struct game_state
     r32 PixelsPerMeter;
 
     font_glyph FontGlyphs[('~' - '!') + 1];
+
+    coordinate_system TestCoord;
+    r32 Time;
 
     int ToneHz;
 

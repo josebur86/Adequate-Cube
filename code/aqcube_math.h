@@ -39,6 +39,10 @@ union vector4
     {
         r32 C0, C1, C2, C3;
     };
+    struct
+    {
+        r32 R, G, B, A;
+    };
 };
 
 union rect
@@ -74,6 +78,18 @@ struct matrix44
 //
 // Misc.
 //
+
+inline r32 Cos(r32 Degrees)
+{
+    r32 Result = cosf(Degrees * DEG_TO_RAD);
+    return Result;
+}
+
+inline r32 Sin(r32 Degrees)
+{
+    r32 Result = sinf(Degrees * DEG_TO_RAD);
+    return Result;
+}
 
 inline r32 Tan(r32 Degrees)
 {
@@ -504,3 +520,13 @@ inline r32 Height(rect R)
     r32 Result = R.Bottom - R.Top;
     return Result;
 }
+
+inline vector2 Center(rect R)
+{
+    vector2 Result = {};
+    Result.X = (R.TopLeft.X + R.BottomRight.X) * 0.5f;
+    Result.Y = (R.TopLeft.Y + R.BottomRight.Y) * 0.5f;
+
+    return Result;
+}
+
