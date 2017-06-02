@@ -21,7 +21,7 @@ REM
 set CompilerFlags= /Od /MTd /nologo /Gm- /GR- /EHa- /Zo /Oi /WX /W4 /wd4100 /wd4189 /wd4201 /wd4505 /FC /Z7
 
 REM Linker Flags
-set LinkerFlags= /incremental:no /opt:ref user32.lib Gdi32.lib DSound.lib Winmm.lib
+set LinkerFlags= /incremental:no /opt:ref user32.lib Gdi32.lib DSound.lib Winmm.lib Opengl32.lib
 
 if not exist .\build mkdir .\build
 pushd .\build
