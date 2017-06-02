@@ -2,11 +2,11 @@
 #pragma warning(disable : 4244)
 #pragma warning(disable : 4456)
 #define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include "third_party/stb_image.h"
 #pragma warning(pop)
 
 #define STB_TRUETYPE_IMPLEMENTATION
-#include "stb_truetype.h"
+#include "third_party/stb_truetype.h"
 
 //
 // Font
