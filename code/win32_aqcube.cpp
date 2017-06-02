@@ -713,6 +713,39 @@ static r32 NormalizeControllerAxis(s32 Value, s32 Center, s32 DeadZone)
     return Result;
 }
 
+static HGLRC InitOpenGL(HDC DeviceContext)
+{
+    PIXELFORMATDESCRIPTOR PixelFormatDesc = {};
+    PixelFormatDesc.nSize = sizeof(PIXELFORMATDESCRIPTOR);
+    PixelFormatDesc.nVersion = 1;
+    PixelFormatDesc.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
+    PixelFormatDesc.iPixelType = PFD_TYPE_RGBA;
+    PixelFormatDesc.cColorBits = 32;
+    //PixelFormatDesc.cDepthBits = ?;
+    //PixelFormatDesc.cStencilBits = ?;
+    PixelFormatDesc.iLayerType = PFD_MAIN_PLANE;
+
+    int PixelFormat = ChoosePixelFormat(DeviceContext, &PixelFormatDesc);
+    Assert(PixelFormat);
+
+    BOOL Result = SetPixelFormat(DeviceContext, PixelFormat, &PixelFormatDesc);
+    Assert(Result == TRUE);
+
+    HGLRC GLContext = wglCreateContext(DeviceContext);
+    Assert(GLContext);
+
+    Result = wglMakeCurrent(DeviceContext, GLContext);
+    Assert(Result == TRUE);
+
+    return GLContext;
+}
+
+static void KillOpenGL(HGLRC GLContext)
+{
+    wglMakeCurrent(0, 0);
+    wglDeleteContext(GLContext);
+}
+
 int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLine, int ShowCode)
 {
     Win32LoadDirectInput();
@@ -734,6 +767,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
         {
             IDirectInputDevice8 *Controller = Win32InitDirectInputController(Instance, Window);
             HDC DeviceContext = GetDC(Window);
+            HGLRC GLContext = InitOpenGL(DeviceContext);
 
             game_memory Memory = {};
             Memory.PermanentStorageSize = Megabytes(64);
@@ -963,6 +997,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                 }
             }
 
+            KillOpenGL(GLContext);
             ReleaseDC(Window, DeviceContext);
         }
     }
