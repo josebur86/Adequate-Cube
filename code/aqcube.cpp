@@ -7,9 +7,14 @@
 //
 // Rendering
 //
-
-static void ClearBuffer(game_back_buffer *BackBuffer, u8 R, u8 G, u8 B)
+struct render_target
 {
+    game_back_buffer *BackBuffer;
+};
+static void ClearBuffer(render_target RenderTarget, u8 R, u8 G, u8 B)
+{
+    game_back_buffer *BackBuffer = RenderTarget.BackBuffer;
+
     s8 *Row = (s8 *)BackBuffer->Memory;
     for (int YIndex = 0; YIndex < BackBuffer->Height; ++YIndex)
     {
@@ -23,8 +28,10 @@ static void ClearBuffer(game_back_buffer *BackBuffer, u8 R, u8 G, u8 B)
     }
 }
 
-static void DrawRectangle(game_back_buffer *BackBuffer, int X, int Y, int Width, int Height, u8 R, u8 G, u8 B)
+static void DrawRectangle(render_target RenderTarget, int X, int Y, int Width, int Height, u8 R, u8 G, u8 B)
 {
+    game_back_buffer *BackBuffer = RenderTarget.BackBuffer;
+
     for (int YIndex = 0; YIndex < Height; ++YIndex)
     {
         u32 *Pixel = (u32 *)BackBuffer->Memory + ((Y + YIndex) * BackBuffer->Width) + X;
@@ -39,8 +46,10 @@ static void DrawRectangle(game_back_buffer *BackBuffer, int X, int Y, int Width,
     }
 }
 
-static void DrawBitmap(game_back_buffer *BackBuffer, s32 X, s32 Y, loaded_bitmap Bitmap)
+static void DrawBitmap(render_target RenderTarget, s32 X, s32 Y, loaded_bitmap Bitmap)
 {
+    game_back_buffer *BackBuffer = RenderTarget.BackBuffer;
+
     X -= Bitmap.Width / 2;
     Y -= Bitmap.Height / 2;
 
@@ -117,7 +126,7 @@ static void DEBUGDrawTextLine(game_back_buffer *BackBuffer, game_state *GameStat
 
         u32 Y = AtY + Glyph->Baseline + Glyph->Top;
         u32 X = AtX + Glyph->ToLeftEdge;
-        DrawBitmap(BackBuffer, X + (Glyph->Glyph.Width / 2), Y + (Glyph->Glyph.Height / 2), Glyph->Glyph);
+        //DrawBitmap(BackBuffer, X + (Glyph->Glyph.Width / 2), Y + (Glyph->Glyph.Height / 2), Glyph->Glyph);
         AtX += Glyph->AdvanceWidth;
 #if 1
         if ((Text + 1) && *(Text + 1) != '\0')
@@ -185,7 +194,8 @@ static void PushBitmap(render_group *RenderGroup, vector2 P, loaded_bitmap Bitma
     Entry->Bitmap = Bitmap;
 }
 
-static void RenderGroupToTarget(game_back_buffer *BackBuffer, render_group *RenderGroup)
+
+static void RenderGroupToTarget(render_target RenderTarget, render_group *RenderGroup)
 {
     u64 EntryBaseAddress = RenderGroup->EntryArena.BaseAddress;
     u64 EntryOffset = 0;
@@ -197,7 +207,7 @@ static void RenderGroupToTarget(game_back_buffer *BackBuffer, render_group *Rend
             case RenderGroupEntryType_Clear:
             {
                 render_group_entry_clear *ClearEntry = (render_group_entry_clear *)Entry;
-                ClearBuffer(BackBuffer, (u8)ClearEntry->C.R, (u8)ClearEntry->C.G, (u8)ClearEntry->C.B);
+                ClearBuffer(RenderTarget, (u8)ClearEntry->C.R, (u8)ClearEntry->C.G, (u8)ClearEntry->C.B);
 
                 EntryOffset += sizeof(render_group_entry_clear);
             } break;
@@ -206,7 +216,7 @@ static void RenderGroupToTarget(game_back_buffer *BackBuffer, render_group *Rend
                 render_group_entry_draw_bitmap *DrawBitmapEntry = (render_group_entry_draw_bitmap *)Entry;
                 s32 X = (s32)(DrawBitmapEntry->P.X * RenderGroup->PixelsPerMeter);
                 s32 Y = (s32)(DrawBitmapEntry->P.Y * RenderGroup->PixelsPerMeter);
-                DrawBitmap(BackBuffer, X, Y, DrawBitmapEntry->Bitmap);
+                DrawBitmap(RenderTarget, X, Y, DrawBitmapEntry->Bitmap);
 
                 EntryOffset += sizeof(render_group_entry_draw_bitmap);
             } break;
@@ -218,7 +228,7 @@ static void RenderGroupToTarget(game_back_buffer *BackBuffer, render_group *Rend
     }
 }
 
-static void Render(game_back_buffer *BackBuffer, game_state *GameState, r32 LastFrameTime)
+static void Render(render_target RenderTarget, game_state *GameState, r32 LastFrameTime)
 {
     AtX = 10;
     AtY = 10;
@@ -229,11 +239,13 @@ static void Render(game_back_buffer *BackBuffer, game_state *GameState, r32 Last
     entity Ship = GameState->Ship;
     PushBitmap(&RenderGroup, Ship.P, GameState->ShipBitmap);
 
-    RenderGroupToTarget(BackBuffer, &RenderGroup);
+    RenderGroupToTarget(RenderTarget, &RenderGroup);
 
+#if 0
     char Buffer[256];
     sprintf_s(Buffer, "Last Frame Time: %.2fms", LastFrameTime);
     DEBUGDrawTextLine(BackBuffer, GameState, Buffer);
+#endif
 }
 
 extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
@@ -350,7 +362,9 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
     GameState->TestCoord.YAxis = 2*V2(-GameState->TestCoord.XAxis.Y, GameState->TestCoord.XAxis.X);
     GameState->TestCoord.Color= V4(1, 1, 0, 1);
 
-    Render(BackBuffer, GameState, LastFrameTime);
+    render_target RenderTarget = {};
+    RenderTarget.BackBuffer= BackBuffer;
+    Render(RenderTarget, GameState, LastFrameTime);
 }
 
 // TODO(joe): This function will need to be performant.
