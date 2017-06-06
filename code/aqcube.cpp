@@ -133,37 +133,103 @@ static void DEBUGDrawTextLine(game_back_buffer *BackBuffer, game_state *GameStat
     AtY += 80; // TODO(joe): Proper line advance.
 }
 
+enum render_group_entry_type
+{
+    Unknown = 0,
+    RenderGroupEntryType_Clear,
+    RenderGroupEntryType_DrawBitmap,
+};
+struct render_group_entry
+{
+    render_group_entry_type Type;
+};
+struct render_group_entry_clear
+{
+    render_group_entry_type Type;
+    vector3 C;
+};
+struct render_group_entry_draw_bitmap
+{
+    render_group_entry_type Type;
+    vector2 P;
+    loaded_bitmap Bitmap;
+};
+
+struct render_group
+{
+    arena EntryArena;
+    //matrix44 Transform;
+    r32 PixelsPerMeter;
+
+};
+static render_group BeginRenderGroup(arena *Arena, u64 Size, r32 PixelsPerMeter)
+{
+    render_group Group = {};
+    Group.EntryArena = SubArena(Arena, Size);
+    Group.PixelsPerMeter = PixelsPerMeter;
+
+    return Group;
+}
+
+static void PushClear(render_group *RenderGroup, vector3 C)
+{
+    render_group_entry_clear *Entry = PushStruct(&RenderGroup->EntryArena, render_group_entry_clear);
+    Entry->Type = RenderGroupEntryType_Clear;
+    Entry->C = C;
+}
+static void PushBitmap(render_group *RenderGroup, vector2 P, loaded_bitmap Bitmap)
+{
+    render_group_entry_draw_bitmap *Entry = PushStruct(&RenderGroup->EntryArena, render_group_entry_draw_bitmap);
+    Entry->Type = RenderGroupEntryType_DrawBitmap;
+    Entry->P = P;
+    Entry->Bitmap = Bitmap;
+}
+
+static void RenderGroupToTarget(game_back_buffer *BackBuffer, render_group *RenderGroup)
+{
+    u64 EntryBaseAddress = RenderGroup->EntryArena.BaseAddress;
+    u64 EntryOffset = 0;
+    while (EntryOffset < RenderGroup->EntryArena.Size)
+    {
+        render_group_entry *Entry = (render_group_entry *)(EntryBaseAddress + EntryOffset);
+        switch(Entry->Type)
+        {
+            case RenderGroupEntryType_Clear:
+            {
+                render_group_entry_clear *ClearEntry = (render_group_entry_clear *)Entry;
+                ClearBuffer(BackBuffer, (u8)ClearEntry->C.R, (u8)ClearEntry->C.G, (u8)ClearEntry->C.B);
+
+                EntryOffset += sizeof(render_group_entry_clear);
+            } break;
+            case RenderGroupEntryType_DrawBitmap:
+            {
+                render_group_entry_draw_bitmap *DrawBitmapEntry = (render_group_entry_draw_bitmap *)Entry;
+                s32 X = (s32)(DrawBitmapEntry->P.X * RenderGroup->PixelsPerMeter);
+                s32 Y = (s32)(DrawBitmapEntry->P.Y * RenderGroup->PixelsPerMeter);
+                DrawBitmap(BackBuffer, X, Y, DrawBitmapEntry->Bitmap);
+
+                EntryOffset += sizeof(render_group_entry_draw_bitmap);
+            } break;
+            default:
+            {
+                Assert(!"Render Group Entry Not Supported");
+            }
+        }
+    }
+}
+
 static void Render(game_back_buffer *BackBuffer, game_state *GameState, r32 LastFrameTime)
 {
     AtX = 10;
     AtY = 10;
    
-    ClearBuffer(BackBuffer, 0, 43, 54);
+    render_group RenderGroup = BeginRenderGroup(&GameState->TransArena, Megabytes(16), GameState->PixelsPerMeter);
+    PushClear(&RenderGroup, V3(0, 43, 54));
 
     entity Ship = GameState->Ship;
+    PushBitmap(&RenderGroup, Ship.P, GameState->ShipBitmap);
 
-    s32 ShipX = (s32)(Ship.P.X * GameState->PixelsPerMeter);
-    s32 ShipY = (s32)(Ship.P.Y * GameState->PixelsPerMeter);
-    DrawBitmap(BackBuffer, ShipX, ShipY, GameState->ShipBitmap);
-
-    coordinate_system *Coord = &GameState->TestCoord;
-    vector2 Point = Coord->Origin;
-    DrawRectangle(BackBuffer, (s32)Point.X, (s32)Point.Y, 4, 4, 
-            u8(255.0f * Coord->Color.R), 
-            u8(255.0f * Coord->Color.G), 
-            u8(255.0f * Coord->Color.B));
-
-    Point = Coord->Origin + Coord->XAxis;
-    DrawRectangle(BackBuffer, (s32)Point.X, (s32)Point.Y, 4, 4, 
-            u8(255.0f * Coord->Color.R), 
-            u8(255.0f * Coord->Color.G), 
-            u8(255.0f * Coord->Color.B));
-
-    Point = Coord->Origin + Coord->YAxis;
-    DrawRectangle(BackBuffer, (s32)Point.X, (s32)Point.Y, 4, 4, 
-            u8(255.0f * Coord->Color.R), 
-            u8(255.0f * Coord->Color.G), 
-            u8(255.0f * Coord->Color.B));
+    RenderGroupToTarget(BackBuffer, &RenderGroup);
 
     char Buffer[256];
     sprintf_s(Buffer, "Last Frame Time: %.2fms", LastFrameTime);
@@ -180,6 +246,7 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
         GameState->Platform.DEBUGGetFontKernAdvanceFor = Memory->DEBUGGetFontKernAdvanceFor;
 
         GameState->Arena = InitializeArena((u64)((u8 *)Memory->PermanentStorage + sizeof(*GameState)), Gigabytes(1));
+        GameState->TransArena = InitializeArena((u64)Memory->TransientStorage, Megabytes(256));
 
         GameState->PixelsPerMeter = 6.54f;
         r32 MetersPerPixel = 1.0f / GameState->PixelsPerMeter;
@@ -202,11 +269,10 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
         }
 
         GameState->ToneHz = 256;
-
-
         
         Memory->IsInitialized = true;
     }
+    ClearArena(&GameState->TransArena);
 
     world *World = &GameState->World;
     entity *Ship = &GameState->Ship;

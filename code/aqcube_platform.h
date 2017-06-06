@@ -57,6 +57,24 @@ void *PushSize(arena *Arena, u64 Size)
     return Result;
 }
 
+arena SubArena(arena *Arena, u64 Size)
+{
+    void *Memory = PushSize(Arena, Size);
+
+    arena SubArena = {};
+    SubArena.BaseAddress = (u64)Memory;
+    SubArena.MaxSize = Size;
+
+    return SubArena;
+}
+
+void ClearArena(arena *Arena)
+{
+    Arena->Size = 0;
+}
+
+#define PushStruct(Arena, Structure) (Structure *)PushSize(Arena, sizeof(Structure))
+
 //
 // Debug File Operations
 //

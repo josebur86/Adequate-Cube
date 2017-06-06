@@ -61,6 +61,7 @@ struct coordinate_system
 struct game_state
 {
     arena Arena;
+    arena TransArena;
 
     world World;
     entity Ship;

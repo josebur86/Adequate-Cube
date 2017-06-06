@@ -474,6 +474,16 @@ inline matrix44 Translate(matrix44 M, vector3 T)
     return Result;
 }
 
+inline matrix44 Scale(matrix44 M, vector3 S)
+{
+    matrix44 Result = M;
+    Result.R0.C0 = S.X;
+    Result.R1.C1 = S.Y;
+    Result.R2.C2 = S.Z;
+
+    return Result;
+}
+
 inline matrix44 LookAt(vector3 Position, vector3 Target, vector3 Up)
 {
     vector3 Direction = Normalize(Target - Position); //Normalize(Position - Target);
