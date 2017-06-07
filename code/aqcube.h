@@ -25,8 +25,10 @@
  */
 
 #include "aqcube_math.h"
+#include "aqcube_renderer.h"
 #include "aqcube_platform.h"
 
+// TODO(joe): Move this to platform.h?
 struct platform
 {
     debug_load_bitmap *DEBUGLoadBitmap;
@@ -76,6 +78,7 @@ struct game_state
     int ToneHz;
 
     platform Platform;
+    renderer Renderer;
 };
 
 // TODO(joe): Include the transition count?

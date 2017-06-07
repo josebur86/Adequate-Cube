@@ -10,9 +10,11 @@
 #include "third_party/GLAD/src/glad.c"
 
 #include "aqcube.h"
+#include "aqcube_math.h"
+#include "aqcube_renderer.h"
 #include "aqcube_platform.h"
 #include "aqcube_platform.cpp"
-#include "aqcube_math.h"
+#include "aqcube_software_renderer.cpp"
 #include "aqcube_controller.h"
 
 read_file_result DEBUGWin32ReadFile(char *FileName);
@@ -571,6 +573,9 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
             Memory.DEBUGLoadFontGlyph = DEBUGLoadFontGlyph;
             Memory.DEBUGGetFontKernAdvanceFor = DEBUGGetFontKernAdvanceFor;
 
+            Memory.RendererClear = SoftwareRendererClear;
+            Memory.RendererDrawBitmap = SoftwareRendererDrawBitmap;
+
             char GameDLLFileName[] = "../build/aqcube.dll";
             char GameTempDLLFileName[] = "../build/aqcube_temp.dll";
             char GameLockFile[] = "../build/lock.tmp";
@@ -593,6 +598,16 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
 
                     vector2 ClientSize = V2(960, 540);
                     Win32ResizeBackBuffer(&GlobalBackBuffer, ClientSize);
+                    game_back_buffer BackBuffer = {};
+                    BackBuffer.Memory = GlobalBackBuffer.Memory;
+                    BackBuffer.Width = GlobalBackBuffer.Width;
+                    BackBuffer.Height = GlobalBackBuffer.Height;
+                    BackBuffer.Pitch = GlobalBackBuffer.Pitch;
+                    BackBuffer.BytesPerPixel = GlobalBackBuffer.BytesPerPixel;
+                    software_render_target RenderTarget = {};
+                    RenderTarget.Type = RenderTarget_Software;
+                    RenderTarget.BackBuffer = &BackBuffer;
+                    Memory.RenderTarget = (render_target *)&RenderTarget;
 
                     bool SoundIsValid = false;
                     win32_sound_output SoundOutput = {};
@@ -660,13 +675,7 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
 
                         //Win32ResizeBackBuffer(&GlobalBackBuffer, WindowSize);
 
-                        game_back_buffer BackBuffer = {};
-                        BackBuffer.Memory = GlobalBackBuffer.Memory;
-                        BackBuffer.Width = GlobalBackBuffer.Width;
-                        BackBuffer.Height = GlobalBackBuffer.Height;
-                        BackBuffer.Pitch = GlobalBackBuffer.Pitch;
-                        BackBuffer.BytesPerPixel = GlobalBackBuffer.BytesPerPixel;
-
+                        
                         if (Game.UpdateGameAndRender)
                         {
                             Game.UpdateGameAndRender(&Memory, &BackBuffer, NewInput, LastFrameTime);

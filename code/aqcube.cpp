@@ -4,95 +4,6 @@
 #include <math.h>
 #include <stdio.h>
 
-//
-// Rendering
-//
-struct render_target
-{
-    game_back_buffer *BackBuffer;
-};
-static void ClearBuffer(render_target RenderTarget, u8 R, u8 G, u8 B)
-{
-    game_back_buffer *BackBuffer = RenderTarget.BackBuffer;
-
-    s8 *Row = (s8 *)BackBuffer->Memory;
-    for (int YIndex = 0; YIndex < BackBuffer->Height; ++YIndex)
-    {
-        s32 *Pixel = (s32 *)Row;
-        for (int XIndex = 0; XIndex < BackBuffer->Width; ++XIndex)
-        {
-            *Pixel++ = (R << 16) | (G << 8) | (B << 0);
-        }
-
-        Row += BackBuffer->Pitch;
-    }
-}
-
-static void DrawRectangle(render_target RenderTarget, int X, int Y, int Width, int Height, u8 R, u8 G, u8 B)
-{
-    game_back_buffer *BackBuffer = RenderTarget.BackBuffer;
-
-    for (int YIndex = 0; YIndex < Height; ++YIndex)
-    {
-        u32 *Pixel = (u32 *)BackBuffer->Memory + ((Y + YIndex) * BackBuffer->Width) + X;
-        for (int XIndex = 0; XIndex < Width; ++XIndex)
-        {
-            if (X + XIndex < BackBuffer->Width && X + XIndex >= 0 && Y + YIndex < BackBuffer->Height && Y + YIndex >= 0)
-            {
-                *Pixel = (R << 16) | (G << 8) | (B << 0);
-            }
-            ++Pixel;
-        }
-    }
-}
-
-static void DrawBitmap(render_target RenderTarget, s32 X, s32 Y, loaded_bitmap Bitmap)
-{
-    game_back_buffer *BackBuffer = RenderTarget.BackBuffer;
-
-    X -= Bitmap.Width / 2;
-    Y -= Bitmap.Height / 2;
-
-    u8 *SourceRow = Bitmap.Pixels;
-    u8 *DestRow = (u8 *)((u32 *)BackBuffer->Memory + (Y * BackBuffer->Width) + X);
-
-    for (s32 RowIndex = 0; RowIndex < (s32)Bitmap.Height; ++RowIndex)
-    {
-        u32 *SourcePixel = (u32 *)SourceRow;
-        u32 *DestPixel = (u32 *)DestRow;
-
-        for (s32 ColIndex = 0; ColIndex < (s32)Bitmap.Width; ++ColIndex)
-        {
-            if (X + ColIndex < BackBuffer->Width && X + ColIndex >= 0 && 
-                Y + RowIndex < BackBuffer->Height && Y + RowIndex >= 0)
-            {
-                r32 SA = ((r32)((*SourcePixel >> 24) & 0xFF) / 255.0f);
-                r32 DA = 1.0f - SA;
-
-                u8 SR = ((*SourcePixel >> 0)  & 0xFF);
-                u8 SG = ((*SourcePixel >> 8)  & 0xFF);
-                u8 SB = ((*SourcePixel >> 16) & 0xFF);
-
-                u8 DR = ((*DestPixel >> 0)  & 0xFF);
-                u8 DG = ((*DestPixel >> 8)  & 0xFF);
-                u8 DB = ((*DestPixel >> 16) & 0xFF);
-
-                u32 C = (u8(DA * DR + SA * SR) << 0) | 
-                        (u8(DA * DG + SA * SG) << 8) |
-                        (u8(DA * DB + SA * SB) << 16);
-
-                *DestPixel = C;
-            }
-
-            ++DestPixel;
-            ++SourcePixel;
-        }
-
-        DestRow += BackBuffer->Pitch;
-        SourceRow += Bitmap.Pitch;
-    }
-}
-
 static font_glyph * GetFontGlyphFor(game_state *GameState, char C)
 {
     font_glyph *Glyph = GameState->FontGlyphs + (C - 32);
@@ -142,93 +53,7 @@ static void DEBUGDrawTextLine(game_back_buffer *BackBuffer, game_state *GameStat
     AtY += 80; // TODO(joe): Proper line advance.
 }
 
-enum render_group_entry_type
-{
-    Unknown = 0,
-    RenderGroupEntryType_Clear,
-    RenderGroupEntryType_DrawBitmap,
-};
-struct render_group_entry
-{
-    render_group_entry_type Type;
-};
-struct render_group_entry_clear
-{
-    render_group_entry_type Type;
-    vector3 C;
-};
-struct render_group_entry_draw_bitmap
-{
-    render_group_entry_type Type;
-    vector2 P;
-    loaded_bitmap Bitmap;
-};
-
-struct render_group
-{
-    arena EntryArena;
-    //matrix44 Transform;
-    r32 PixelsPerMeter;
-
-};
-static render_group BeginRenderGroup(arena *Arena, u64 Size, r32 PixelsPerMeter)
-{
-    render_group Group = {};
-    Group.EntryArena = SubArena(Arena, Size);
-    Group.PixelsPerMeter = PixelsPerMeter;
-
-    return Group;
-}
-
-static void PushClear(render_group *RenderGroup, vector3 C)
-{
-    render_group_entry_clear *Entry = PushStruct(&RenderGroup->EntryArena, render_group_entry_clear);
-    Entry->Type = RenderGroupEntryType_Clear;
-    Entry->C = C;
-}
-static void PushBitmap(render_group *RenderGroup, vector2 P, loaded_bitmap Bitmap)
-{
-    render_group_entry_draw_bitmap *Entry = PushStruct(&RenderGroup->EntryArena, render_group_entry_draw_bitmap);
-    Entry->Type = RenderGroupEntryType_DrawBitmap;
-    Entry->P = P;
-    Entry->Bitmap = Bitmap;
-}
-
-
-static void RenderGroupToTarget(render_target RenderTarget, render_group *RenderGroup)
-{
-    u64 EntryBaseAddress = RenderGroup->EntryArena.BaseAddress;
-    u64 EntryOffset = 0;
-    while (EntryOffset < RenderGroup->EntryArena.Size)
-    {
-        render_group_entry *Entry = (render_group_entry *)(EntryBaseAddress + EntryOffset);
-        switch(Entry->Type)
-        {
-            case RenderGroupEntryType_Clear:
-            {
-                render_group_entry_clear *ClearEntry = (render_group_entry_clear *)Entry;
-                ClearBuffer(RenderTarget, (u8)ClearEntry->C.R, (u8)ClearEntry->C.G, (u8)ClearEntry->C.B);
-
-                EntryOffset += sizeof(render_group_entry_clear);
-            } break;
-            case RenderGroupEntryType_DrawBitmap:
-            {
-                render_group_entry_draw_bitmap *DrawBitmapEntry = (render_group_entry_draw_bitmap *)Entry;
-                s32 X = (s32)(DrawBitmapEntry->P.X * RenderGroup->PixelsPerMeter);
-                s32 Y = (s32)(DrawBitmapEntry->P.Y * RenderGroup->PixelsPerMeter);
-                DrawBitmap(RenderTarget, X, Y, DrawBitmapEntry->Bitmap);
-
-                EntryOffset += sizeof(render_group_entry_draw_bitmap);
-            } break;
-            default:
-            {
-                Assert(!"Render Group Entry Not Supported");
-            }
-        }
-    }
-}
-
-static void Render(render_target RenderTarget, game_state *GameState, r32 LastFrameTime)
+static void Render(renderer Renderer, game_state *GameState, r32 LastFrameTime)
 {
     AtX = 10;
     AtY = 10;
@@ -239,7 +64,7 @@ static void Render(render_target RenderTarget, game_state *GameState, r32 LastFr
     entity Ship = GameState->Ship;
     PushBitmap(&RenderGroup, Ship.P, GameState->ShipBitmap);
 
-    RenderGroupToTarget(RenderTarget, &RenderGroup);
+    RenderGroupToTarget(Renderer, &RenderGroup);
 
 #if 0
     char Buffer[256];
@@ -256,6 +81,10 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
         GameState->Platform.DEBUGLoadBitmap = Memory->DEBUGLoadBitmap;
         GameState->Platform.DEBUGLoadFontGlyph = Memory->DEBUGLoadFontGlyph;
         GameState->Platform.DEBUGGetFontKernAdvanceFor = Memory->DEBUGGetFontKernAdvanceFor;
+
+        GameState->Renderer.Target = Memory->RenderTarget;
+        GameState->Renderer.Clear = Memory->RendererClear;
+        GameState->Renderer.DrawBitmap = Memory->RendererDrawBitmap;
 
         GameState->Arena = InitializeArena((u64)((u8 *)Memory->PermanentStorage + sizeof(*GameState)), Gigabytes(1));
         GameState->TransArena = InitializeArena((u64)Memory->TransientStorage, Megabytes(256));
@@ -362,9 +191,7 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
     GameState->TestCoord.YAxis = 2*V2(-GameState->TestCoord.XAxis.Y, GameState->TestCoord.XAxis.X);
     GameState->TestCoord.Color= V4(1, 1, 0, 1);
 
-    render_target RenderTarget = {};
-    RenderTarget.BackBuffer= BackBuffer;
-    Render(RenderTarget, GameState, LastFrameTime);
+    Render(GameState->Renderer, GameState, LastFrameTime);
 }
 
 // TODO(joe): This function will need to be performant.

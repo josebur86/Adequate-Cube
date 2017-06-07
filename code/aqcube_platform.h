@@ -4,76 +4,7 @@
 extern "C" {
 #endif
 
-#include <stdint.h>
-
-typedef float r32;
-
-typedef int8_t s8;
-typedef uint8_t u8;
-
-typedef int16_t s16;
-typedef uint16_t u16;
-
-typedef int32_t s32;
-typedef uint32_t u32;
-
-typedef int64_t s64;
-typedef uint64_t u64;
-
-#define Kilobytes(Value) ((Value) * 1024)
-#define Megabytes(Value) ((Kilobytes(Value)) * 1024)
-#define Gigabytes(Value) ((Megabytes(Value)) * 1024)
-
-#define Assert(Condition) if (!(Condition)) { *(int *)0 = 0; }
-#define ArrayCount(Array) sizeof((Array)) / sizeof((Array[0]))
-
-//
-// Arena
-//
-struct arena
-{
-    u64 BaseAddress;
-    u64 Size;
-    u64 MaxSize;
-};
-
-arena InitializeArena(u64 BaseAddress, u64 MaxSize)
-{
-    arena Result = {};
-    Result.BaseAddress = BaseAddress;
-    Result.MaxSize = MaxSize;
-
-    return Result;
-}
-
-void *PushSize(arena *Arena, u64 Size)
-{
-    Assert(Arena->Size + Size <= Arena->MaxSize);
-
-    void *Result = (void *)(Arena->BaseAddress + Arena->Size);
-    
-    Arena->Size += Size;
-
-    return Result;
-}
-
-arena SubArena(arena *Arena, u64 Size)
-{
-    void *Memory = PushSize(Arena, Size);
-
-    arena SubArena = {};
-    SubArena.BaseAddress = (u64)Memory;
-    SubArena.MaxSize = Size;
-
-    return SubArena;
-}
-
-void ClearArena(arena *Arena)
-{
-    Arena->Size = 0;
-}
-
-#define PushStruct(Arena, Structure) (Structure *)PushSize(Arena, sizeof(Structure))
+#include "aqcube_arena.h"
 
 //
 // Debug File Operations
@@ -89,15 +20,6 @@ read_file_result DEBUGWin32ReadFile(char *Filename);
 bool DEBUGWin32WriteFile(char *Filename, void *Memory, u64 FileSize);
 void Win32FreeMemory(void *Memory);
 
-typedef struct loaded_bitmap
-{
-    bool IsValid;
-
-    u32 Width;
-    u32 Height;
-    u32 Pitch;
-    u8 *Pixels;
-} loaded_bitmap;
 typedef loaded_bitmap debug_load_bitmap(arena *Arena, char *Filename);
 
 struct font_glyph
@@ -125,6 +47,10 @@ typedef struct game_memory
     debug_load_bitmap *DEBUGLoadBitmap;
     debug_load_font_glyph *DEBUGLoadFontGlyph;
     debug_get_font_kern_advance_for *DEBUGGetFontKernAdvanceFor;
+
+    render_target *RenderTarget;
+    renderer_clear *RendererClear;
+    renderer_draw_bitmap *RendererDrawBitmap;
 
     bool IsInitialized;
 } game_memory;

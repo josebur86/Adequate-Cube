@@ -1,6 +1,6 @@
 #pragma once
 
-#include "aqcube_platform.h"
+#include "aqcube_defines.h"
 #include <math.h>
 #include <float.h>
 
