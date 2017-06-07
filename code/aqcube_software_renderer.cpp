@@ -7,21 +7,6 @@ struct software_render_target
     game_back_buffer *BackBuffer;
 };
 
-static void ClearBuffer(game_back_buffer *BackBuffer, u8 R, u8 G, u8 B)
-{
-    s8 *Row = (s8 *)BackBuffer->Memory;
-    for (int YIndex = 0; YIndex < BackBuffer->Height; ++YIndex)
-    {
-        s32 *Pixel = (s32 *)Row;
-        for (int XIndex = 0; XIndex < BackBuffer->Width; ++XIndex)
-        {
-            *Pixel++ = (R << 16) | (G << 8) | (B << 0);
-        }
-
-        Row += BackBuffer->Pitch;
-    }
-}
-
 static void DrawRectangle(game_back_buffer *BackBuffer, int X, int Y, int Width, int Height, u8 R, u8 G, u8 B)
 {
     for (int YIndex = 0; YIndex < Height; ++YIndex)
@@ -38,8 +23,38 @@ static void DrawRectangle(game_back_buffer *BackBuffer, int X, int Y, int Width,
     }
 }
 
-static void DrawBitmap(game_back_buffer *BackBuffer, s32 X, s32 Y, loaded_bitmap Bitmap)
+RENDERER_CLEAR(SoftwareRendererClear)
 {
+    Assert(Target->Type == RenderTarget_Software);
+    software_render_target *SoftwareTarget = (software_render_target *)Target;
+
+    u8 R = (u8)C.R;
+    u8 G = (u8)C.G;
+    u8 B = (u8)C.B;
+    game_back_buffer *BackBuffer = SoftwareTarget->BackBuffer;
+    
+    s8 *Row = (s8 *)BackBuffer->Memory;
+    for (int YIndex = 0; YIndex < BackBuffer->Height; ++YIndex)
+    {
+        s32 *Pixel = (s32 *)Row;
+        for (int XIndex = 0; XIndex < BackBuffer->Width; ++XIndex)
+        {
+            *Pixel++ = (R << 16) | (G << 8) | (B << 0);
+        }
+
+        Row += BackBuffer->Pitch;
+    }
+}
+
+RENDERER_DRAW_BITMAP(SoftwareRendererDrawBitmap)
+{
+    Assert(Target->Type == RenderTarget_Software);
+    software_render_target *SoftwareTarget = (software_render_target *)Target;
+
+    s32 X = (s32)P.X;
+    s32 Y = (s32)P.Y;
+    game_back_buffer *BackBuffer = SoftwareTarget->BackBuffer;
+    
     X -= Bitmap.Width / 2;
     Y -= Bitmap.Height / 2;
 
@@ -81,18 +96,4 @@ static void DrawBitmap(game_back_buffer *BackBuffer, s32 X, s32 Y, loaded_bitmap
         DestRow += BackBuffer->Pitch;
         SourceRow += Bitmap.Pitch;
     }
-}
-
-RENDERER_CLEAR(SoftwareRendererClear)
-{
-    Assert(Target->Type == RenderTarget_Software);
-    software_render_target *SoftwareTarget = (software_render_target *)Target;
-    ClearBuffer(SoftwareTarget->BackBuffer, (u8)C.R, (u8)C.G, (u8)C.B);
-}
-
-RENDERER_DRAW_BITMAP(SoftwareRendererDrawBitmap)
-{
-    Assert(Target->Type == RenderTarget_Software);
-    software_render_target *SoftwareTarget = (software_render_target *)Target;
-    DrawBitmap(SoftwareTarget->BackBuffer, (s32)P.X, (s32)P.Y, Bitmap);
 }
