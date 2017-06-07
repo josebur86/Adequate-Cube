@@ -28,16 +28,20 @@ static u32 AtX = 10;
 static u32 AtY = 10;
 
 // TODO(joe): Multiple Fonts?.
-static void DEBUGDrawTextLine(game_back_buffer *BackBuffer, game_state *GameState, char *Text)
+static void DEBUGDrawTextLine(renderer Renderer, game_state *GameState, char *Text)
 {
+    render_group RenderGroup = BeginRenderGroup(&GameState->TransArena, Megabytes(16), 1.0f);
+
     while(Text && *Text != '\0')
     {
         font_glyph *Glyph = GetFontGlyphFor(GameState, *Text);
         Assert(Glyph->IsLoaded);
 
-        u32 Y = AtY + Glyph->Baseline + Glyph->Top;
-        u32 X = AtX + Glyph->ToLeftEdge;
-        //DrawBitmap(BackBuffer, X + (Glyph->Glyph.Width / 2), Y + (Glyph->Glyph.Height / 2), Glyph->Glyph);
+        r32 Y = (r32)(AtY + Glyph->Baseline + Glyph->Top);
+        r32 X = (r32)(AtX + Glyph->ToLeftEdge);
+        vector2 P = V2(X + (Glyph->Glyph.Width / 2.0f), Y + (Glyph->Glyph.Height / 2.0f));
+        PushBitmap(&RenderGroup, P, Glyph->Glyph);
+
         AtX += Glyph->AdvanceWidth;
 #if 1
         if ((Text + 1) && *(Text + 1) != '\0')
@@ -48,6 +52,8 @@ static void DEBUGDrawTextLine(game_back_buffer *BackBuffer, game_state *GameStat
 
         ++Text;
     }
+
+    RenderGroupToTarget(Renderer, &RenderGroup);
 
     AtX = 10;
     AtY += 80; // TODO(joe): Proper line advance.
@@ -66,10 +72,10 @@ static void Render(renderer Renderer, game_state *GameState, r32 LastFrameTime)
 
     RenderGroupToTarget(Renderer, &RenderGroup);
 
-#if 0
+#if 1
     char Buffer[256];
     sprintf_s(Buffer, "Last Frame Time: %.2fms", LastFrameTime);
-    DEBUGDrawTextLine(BackBuffer, GameState, Buffer);
+    DEBUGDrawTextLine(Renderer, GameState, Buffer);
 #endif
 }
 
