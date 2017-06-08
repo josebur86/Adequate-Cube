@@ -283,6 +283,28 @@ inline vector3 operator*(vector3 V, r32 S)
     return operator*(S, V);
 }
 
+inline vector3 operator/(r32 S, vector3 V)
+{
+    vector3 Result = {};
+
+    Result.X = S / V.X;
+    Result.Y = S / V.Y;
+    Result.Z = S / V.Z;
+
+    return Result;
+}
+inline vector3 operator/(vector3 V, r32 S)
+{
+    vector3 Result = {};
+
+    Result.X = V.X / S;
+    Result.Y = V.Y / S;
+    Result.Z = V.Z / S;
+
+    return Result;
+
+}
+
 inline r32 Length(vector3 V)
 {
     r32 Result = SquareRoot(V.X * V.X + V.Y * V.Y + V.Z * V.Z);

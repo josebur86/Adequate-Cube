@@ -95,6 +95,7 @@ extern "C" UPDATE_GAME_AND_RENDER(UpdateGameAndRender)
         GameState->Arena = InitializeArena((u64)((u8 *)Memory->PermanentStorage + sizeof(*GameState)), Gigabytes(1));
         GameState->TransArena = InitializeArena((u64)Memory->TransientStorage, Megabytes(256));
 
+        // TODO(joe): Proper scaling of the ship/entities.
         GameState->PixelsPerMeter = 6.54f;
         r32 MetersPerPixel = 1.0f / GameState->PixelsPerMeter;
         GameState->World.Bounds = Rect(V2(0.0f, 0.0f), 

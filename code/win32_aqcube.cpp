@@ -15,6 +15,7 @@
 #include "aqcube_platform.h"
 #include "aqcube_platform.cpp"
 #include "aqcube_software_renderer.cpp"
+#include "aqcube_opengl_renderer.cpp"
 #include "aqcube_controller.h"
 
 read_file_result DEBUGWin32ReadFile(char *FileName);
@@ -573,8 +574,13 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
             Memory.DEBUGLoadFontGlyph = DEBUGLoadFontGlyph;
             Memory.DEBUGGetFontKernAdvanceFor = DEBUGGetFontKernAdvanceFor;
 
+#if 0
             Memory.RendererClear = SoftwareRendererClear;
             Memory.RendererDrawBitmap = SoftwareRendererDrawBitmap;
+#else
+            Memory.RendererClear = OpenGLRendererClear;
+            Memory.RendererDrawBitmap = OpenGLRendererDrawBitmap;
+#endif
 
             char GameDLLFileName[] = "../build/aqcube.dll";
             char GameTempDLLFileName[] = "../build/aqcube_temp.dll";
@@ -784,7 +790,11 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLi
                         LastFrameTime = 1000.0f * Win32GetElapsedSeconds(LastFrameCount, EndCount);
                         LastFrameCount = EndCount;
 
+#if 0
                         Win32PaintBackBuffer(DeviceContext, &GlobalBackBuffer);
+#else
+                        wglSwapLayerBuffers(DeviceContext, WGL_SWAP_MAIN_PLANE);
+#endif
                     }
                 }
                 else
